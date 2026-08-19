@@ -30,6 +30,7 @@ type DistrictFeature = {
 
 type ProgressKind = "existing" | "new";
 type ProgressView = "completed" | "incomplete";
+type SchoolLevelKey = "elementary" | "junior" | "senior";
 
 const features = geoData.features as DistrictFeature[];
 const initialSchools = baselineSchools;
@@ -45,6 +46,12 @@ const districtOrder = [
   "鳳山區", "林園區", "大寮區", "大樹區", "大社區", "仁武區", "鳥松區", "岡山區", "橋頭區", "燕巢區",
   "田寮區", "阿蓮區", "路竹區", "湖內區", "茄萣區", "永安區", "彌陀區", "梓官區", "旗山區", "美濃區",
   "六龜區", "甲仙區", "杉林區", "內門區", "茂林區", "桃源區", "那瑪夏區",
+];
+
+const schoolLevels: Array<{ key: SchoolLevelKey; label: string }> = [
+  { key: "elementary", label: "國小" },
+  { key: "junior", label: "國中" },
+  { key: "senior", label: "高中" },
 ];
 
 const MAP_WIDTH = 650;
@@ -107,6 +114,13 @@ function schoolType(name: string) {
 
 function schoolTypeFor(school: School) {
   return school.schoolCategory || schoolType(school.name);
+}
+
+function matchesSchoolLevel(school: School, level: SchoolLevelKey) {
+  const type = schoolTypeFor(school);
+  if (level === "elementary") return type === "國小";
+  if (level === "junior") return type === "國中" || type === "國中小";
+  return type === "高中職";
 }
 
 function normalizeSchoolSearchText(value: string) {
@@ -246,10 +260,12 @@ export default function SchoolMapDashboard() {
   const [panelRevision, setPanelRevision] = useState(0);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [progressModal, setProgressModal] = useState<ProgressKind | null>(null);
+  const [progressLevel, setProgressLevel] = useState<SchoolLevelKey | null>(null);
   const [progressView, setProgressView] = useState<ProgressView>("completed");
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
     async function refreshSchools() {
       try {
@@ -264,7 +280,19 @@ export default function SchoolMapDashboard() {
           ? direct.schools.find((school) => school.name === current.name) ?? current
           : null);
       } catch {
-        if (active) setSyncState("unavailable");
+        try {
+          const response = await fetch("/api/schools", { cache: "no-store", signal: controller.signal });
+          if (!response.ok) throw new Error("School sync failed");
+          const payload = await response.json() as {
+            schools?: School[];
+            status?: "synced" | "empty" | "unavailable";
+          };
+          if (!active || !Array.isArray(payload.schools) || payload.schools.length === 0) return;
+          setSchools(payload.schools);
+          setSyncState(payload.status ?? "unavailable");
+        } catch (fallbackError) {
+          if (active && !(fallbackError instanceof DOMException && fallbackError.name === "AbortError")) setSyncState("unavailable");
+        }
       }
     }
 
@@ -277,6 +305,7 @@ export default function SchoolMapDashboard() {
 
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -359,14 +388,39 @@ export default function SchoolMapDashboard() {
     completed: schools.filter((school) => isProgressComplete(school.newImplementationProgress)),
     incomplete: schools.filter((school) => !isProgressComplete(school.newImplementationProgress)),
   }), [schools]);
-  const activeProgress = progressModal === "existing" ? existingProgress : newProgress;
+  const schoolLevelProgress = useMemo(() => {
+    return schoolLevels.map(({ key, label }) => {
+      const levelSchools = schools.filter((school) => matchesSchoolLevel(school, key));
+      return {
+        key,
+        label,
+        total: levelSchools.length,
+        existingCompleted: levelSchools.filter((school) => isProgressComplete(school.existingImplementationProgress)).length,
+        newCompleted: levelSchools.filter((school) => isProgressComplete(school.newImplementationProgress)).length,
+      };
+    });
+  }, [schools]);
+  const progressScopeSchools = progressLevel
+    ? schools.filter((school) => matchesSchoolLevel(school, progressLevel))
+    : schools;
+  const activeProgress = {
+    completed: progressScopeSchools.filter((school) => isProgressComplete(progressFor(school, progressModal ?? "existing"))),
+    incomplete: progressScopeSchools.filter((school) => !isProgressComplete(progressFor(school, progressModal ?? "existing"))),
+  };
   const activeProgressSchools = progressView === "completed" ? activeProgress.completed : activeProgress.incomplete;
-  const activeProgressLabel = progressModal === "existing" ? "既有載具施作進度" : "新載具施作進度";
+  const activeProgressLevelLabel = schoolLevels.find((level) => level.key === progressLevel)?.label;
+  const activeProgressLabel = `${activeProgressLevelLabel ? `${activeProgressLevelLabel} ` : ""}${progressModal === "existing" ? "既有載具施作進度" : "新載具施作進度"}`;
 
-  function openProgress(kind: ProgressKind) {
+  function openProgress(kind: ProgressKind, level: SchoolLevelKey | null = null) {
     setSelectedSchool(null);
     setProgressModal(kind);
+    setProgressLevel(level);
     setProgressView("completed");
+  }
+
+  function closeProgress() {
+    setProgressModal(null);
+    setProgressLevel(null);
   }
 
   function revealSchoolPanel() {
@@ -405,7 +459,7 @@ export default function SchoolMapDashboard() {
       <header className="topbar">
         <div className="brand-mark"><SchoolIcon /></div>
         <div className="brand-copy">
-          <strong>高雄市施工進度追蹤圖</strong>
+          <strong>高雄市載具施工進度追蹤圖</strong>
           <span>115 年中小學數位學習採購案</span>
         </div>
         <div className="topbar-pill" aria-live="polite">
@@ -443,9 +497,61 @@ export default function SchoolMapDashboard() {
             <span className="progress-card-count">已完成 {newProgress.completed.length}／{schools.length} 所</span>
           </button>
         </div>
-        <div className="hero-summary-side" aria-label="資料摘要">
-          <div className="summary-card"><strong>{schools.length}</strong><span>學校總數</span></div>
-          <div className="summary-card selected"><strong>{selectedCount}</strong><span>{selectedDistrict}</span></div>
+        <div className="hero-right-stack">
+          <section className="school-level-progress-panel" aria-labelledby="school-level-progress-title">
+            <div className="school-level-progress-heading">
+              <strong id="school-level-progress-title">各學制完成率</strong>
+              <span>即時同步</span>
+            </div>
+            <div className="school-level-progress-grid">
+              <span className="school-level-corner">載具</span>
+              {schoolLevelProgress.map((level) => (
+                <strong className="school-level-name" key={level.key}>{level.label}</strong>
+              ))}
+
+              <strong className="school-level-row-label existing">既有載具</strong>
+              {schoolLevelProgress.map((level) => (
+                <button
+                  type="button"
+                  className="school-level-progress-item existing"
+                  key={`existing-${level.key}`}
+                  aria-label={`查看${level.label}既有載具已完成學校`}
+                  onClick={() => openProgress("existing", level.key)}
+                >
+                  <span
+                    className="school-level-progress-ring"
+                    style={{ "--school-level-progress-angle": `${completionRateValue(level.existingCompleted, level.total) * 3.6}deg` } as CSSProperties}
+                  >
+                    <strong>{completionRate(level.existingCompleted, level.total)}</strong>
+                  </span>
+                  <small>{level.existingCompleted}／{level.total} 所</small>
+                </button>
+              ))}
+
+              <strong className="school-level-row-label new">新載具</strong>
+              {schoolLevelProgress.map((level) => (
+                <button
+                  type="button"
+                  className="school-level-progress-item new"
+                  key={`new-${level.key}`}
+                  aria-label={`查看${level.label}新載具已完成學校`}
+                  onClick={() => openProgress("new", level.key)}
+                >
+                  <span
+                    className="school-level-progress-ring"
+                    style={{ "--school-level-progress-angle": `${completionRateValue(level.newCompleted, level.total) * 3.6}deg` } as CSSProperties}
+                  >
+                    <strong>{completionRate(level.newCompleted, level.total)}</strong>
+                  </span>
+                  <small>{level.newCompleted}／{level.total} 所</small>
+                </button>
+              ))}
+            </div>
+          </section>
+          <div className="hero-summary-side" aria-label="資料摘要">
+            <div className="summary-card"><strong>{schools.length}</strong><span>學校總數</span></div>
+            <div className="summary-card selected"><strong>{selectedCount}</strong><span>{selectedDistrict}</span></div>
+          </div>
         </div>
       </section>
 
@@ -670,16 +776,16 @@ export default function SchoolMapDashboard() {
         <div
           className="school-modal-backdrop"
           onClick={(event) => {
-            if (event.target === event.currentTarget) setProgressModal(null);
+            if (event.target === event.currentTarget) closeProgress();
           }}
           onKeyDown={(event) => {
-            if (event.key === "Escape") setProgressModal(null);
+            if (event.key === "Escape") closeProgress();
           }}
         >
           <section className="school-detail-modal progress-list-modal" role="dialog" aria-modal="true" aria-labelledby="progress-modal-title">
-            <button type="button" className="modal-close" aria-label="關閉施作進度清單" autoFocus onClick={() => setProgressModal(null)}>×</button>
+            <button type="button" className="modal-close" aria-label="關閉施作進度清單" autoFocus onClick={closeProgress}>×</button>
             <div className="modal-school-icon"><SchoolIcon /></div>
-            <p>全市施作統計</p>
+            <p>{progressLevel ? "各學制施作統計" : "全市施作統計"}</p>
             <h2 id="progress-modal-title">{activeProgressLabel}</h2>
 
             <div className="progress-tabs" aria-label="選擇施作進度">
@@ -714,7 +820,7 @@ export default function SchoolMapDashboard() {
                       type="button"
                       className="progress-school-button"
                       onClick={() => {
-                        setProgressModal(null);
+                        closeProgress();
                         setSelectedSchool(school);
                       }}
                     >

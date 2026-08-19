@@ -95,9 +95,9 @@ button, input, select { font: inherit; }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(440px, 560px) minmax(0, 1fr);
-  gap: 32px;
-  align-items: center;
+  grid-template-columns: minmax(620px, 1.45fr) minmax(420px, 0.75fr);
+  gap: 24px;
+  align-items: start;
   max-width: 1580px;
   margin: 0 auto;
   padding: 34px clamp(20px, 4vw, 56px) 26px;
@@ -130,19 +130,159 @@ button, input, select { font: inherit; }
 
 .hero-progress-center {
   display: grid;
-  grid-column: 2;
+  grid-column: 1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
   width: 100%;
-  justify-self: center;
+  justify-self: start;
 }
 
 .hero-summary-side {
   display: grid;
-  grid-column: 3;
   grid-template-columns: repeat(2, minmax(104px, 1fr));
   gap: 10px;
+}
+
+.hero-right-stack {
+  display: grid;
+  grid-column: 2;
+  gap: 12px;
+  width: 100%;
   justify-self: end;
+}
+
+.school-level-progress-panel {
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 40px rgba(25, 74, 77, 0.07);
+}
+
+.school-level-progress-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.school-level-progress-heading strong {
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.school-level-progress-heading span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.school-level-progress-grid {
+  display: grid;
+  grid-template-columns: 72px repeat(3, minmax(82px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.school-level-corner,
+.school-level-name,
+.school-level-row-label {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.school-level-corner { color: #8b9b9d; }
+.school-level-name { color: var(--ink); }
+
+.school-level-row-label {
+  border-radius: 11px;
+  color: white;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.school-level-row-label.existing { background: #347fbd; }
+.school-level-row-label.new { background: #df7b39; }
+
+.school-level-progress-item {
+  --school-level-progress-color: #347fbd;
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 5px 7px;
+  border: 1px solid #dce8ed;
+  border-radius: 13px;
+  background: #f7fbfd;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.school-level-progress-item.new {
+  --school-level-progress-color: #df7b39;
+  border-color: #f0dfd2;
+  background: #fffaf6;
+}
+
+.school-level-progress-item:hover {
+  transform: translateY(-2px);
+  border-color: #8cb6ca;
+  box-shadow: 0 10px 22px rgba(22, 69, 72, 0.1);
+}
+
+.school-level-progress-item.new:hover { border-color: #e7b68f; }
+
+.school-level-progress-item:focus-visible {
+  outline: 3px solid rgba(31, 111, 120, 0.2);
+  outline-offset: 2px;
+}
+
+.school-level-progress-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: conic-gradient(var(--school-level-progress-color) var(--school-level-progress-angle), #e5eded 0);
+}
+
+.school-level-progress-ring::after {
+  position: absolute;
+  inset: 6px;
+  border-radius: inherit;
+  background: white;
+  content: "";
+}
+
+.school-level-progress-ring strong {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  color: var(--school-level-progress-color);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.school-level-progress-item small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .summary-card {
@@ -172,7 +312,8 @@ button.summary-card {
   --progress-color: var(--teal);
   justify-items: center;
   min-width: 0;
-  padding: 19px 18px 17px;
+  min-height: 292px;
+  padding: 26px 24px 23px;
   cursor: pointer;
   text-align: center;
   transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
@@ -195,16 +336,16 @@ button.summary-card {
 .summary-card .progress-card-label {
   margin-top: 0;
   color: var(--teal-dark);
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 850;
 }
 
 .progress-ring {
   position: relative;
   display: block;
-  width: 104px;
-  height: 104px;
-  margin-top: 11px;
+  width: 146px;
+  height: 146px;
+  margin-top: 15px;
   border-radius: 50%;
   background: conic-gradient(var(--progress-color) var(--progress-angle), #e5eded 0);
   color: var(--progress-color);
@@ -212,7 +353,7 @@ button.summary-card {
 
 .progress-ring::after {
   position: absolute;
-  inset: 10px;
+  inset: 13px;
   border-radius: inherit;
   background: #fff;
   content: "";
@@ -235,7 +376,7 @@ button.summary-card {
 
 .progress-ring strong {
   color: var(--progress-color);
-  font-size: clamp(19px, 1.65vw, 24px);
+  font-size: clamp(27px, 2.3vw, 34px);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -243,16 +384,16 @@ button.summary-card {
 }
 
 .progress-ring small {
-  margin-top: 5px;
+  margin-top: 7px;
   color: #7b8f91;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 850;
 }
 
 .summary-card .progress-card-count {
-  margin-top: 10px;
+  margin-top: 15px;
   color: #778b8d;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -990,8 +1131,9 @@ footer a { color: var(--teal); font-weight: 700; text-underline-offset: 3px; }
 
 @media (max-width: 1000px) {
   .hero { grid-template-columns: 1fr; gap: 28px; }
-  .hero-progress-center { grid-column: 1; width: min(100%, 620px); }
-  .hero-summary-side { grid-column: 1; width: min(100%, 320px); justify-self: center; }
+  .hero-progress-center { grid-column: 1; width: min(100%, 820px); justify-self: center; }
+  .hero-right-stack { grid-column: 1; width: min(100%, 620px); justify-self: center; }
+  .hero-summary-side { width: min(100%, 320px); justify-self: center; }
   .workspace { grid-template-columns: 1fr; }
   .school-panel { max-height: 740px; }
 }
@@ -1006,13 +1148,21 @@ footer a { color: var(--teal); font-weight: 700; text-underline-offset: 3px; }
   .hero h1 { font-size: 40px; }
   .hero-copy { font-size: 13px; }
   .hero-progress-center { gap: 10px; }
+  .hero-right-stack { gap: 10px; }
   .hero-summary-side { width: 100%; }
+  .school-level-progress-panel { padding: 13px 10px; border-radius: 17px; }
+  .school-level-progress-grid { grid-template-columns: 58px repeat(3, minmax(64px, 1fr)); gap: 6px; }
+  .school-level-progress-ring { width: 50px; height: 50px; }
+  .school-level-progress-ring strong { font-size: 11px; }
+  .school-level-progress-item { padding: 7px 3px 6px; }
+  .school-level-progress-item small { font-size: 7px; }
   .summary-card { min-width: 96px; padding: 15px 16px; }
   .progress-summary-card { min-width: 0; padding: 15px 8px 13px; }
+  .progress-summary-card { min-height: 210px; }
   .summary-card .progress-card-label { font-size: 11px; }
-  .progress-ring { width: 82px; height: 82px; }
-  .progress-ring::after { inset: 8px; }
-  .progress-ring strong { font-size: 20px; }
+  .progress-ring { width: 96px; height: 96px; }
+  .progress-ring::after { inset: 9px; }
+  .progress-ring strong { font-size: 22px; }
   .progress-ring small { font-size: 9px; }
   .summary-card .progress-card-count { font-size: 9px; }
   .workspace { min-height: 0; padding: 0 0 26px; }
