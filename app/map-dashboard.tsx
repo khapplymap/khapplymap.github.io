@@ -30,7 +30,7 @@ type DistrictFeature = {
 
 type ProgressKind = "existing" | "new";
 type ProgressView = "completed" | "incomplete";
-type SchoolLevelKey = "elementary" | "junior" | "senior";
+type SchoolLevelKey = "elementary" | "junior" | "senior" | "special";
 
 const features = geoData.features as DistrictFeature[];
 const initialSchools = baselineSchools;
@@ -52,6 +52,7 @@ const schoolLevels: Array<{ key: SchoolLevelKey; label: string }> = [
   { key: "elementary", label: "國小" },
   { key: "junior", label: "國中" },
   { key: "senior", label: "高中" },
+  { key: "special", label: "特教及實驗學校" },
 ];
 
 const MAP_WIDTH = 650;
@@ -120,7 +121,8 @@ function matchesSchoolLevel(school: School, level: SchoolLevelKey) {
   const type = schoolTypeFor(school);
   if (level === "elementary") return type === "國小";
   if (level === "junior") return type === "國中" || type === "國中小";
-  return type === "高中職";
+  if (level === "senior") return type === "高中職";
+  return type === "特教" || type === "其他";
 }
 
 function normalizeSchoolSearchText(value: string) {
