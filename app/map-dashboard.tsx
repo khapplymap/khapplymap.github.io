@@ -31,6 +31,11 @@ type DistrictFeature = {
 type ProgressKind = "existing" | "new";
 type ProgressView = "completed" | "incomplete";
 type SchoolLevelKey = "elementary" | "junior" | "senior" | "special";
+type CountdownClock = {
+  dateLabel: string;
+  timeLabel: string;
+  daysRemaining: number;
+};
 
 const features = geoData.features as DistrictFeature[];
 const initialSchools = baselineSchools;
@@ -58,6 +63,44 @@ const schoolLevels: Array<{ key: SchoolLevelKey; label: string }> = [
 const MAP_WIDTH = 650;
 const MAP_HEIGHT = 820;
 const MAP_PADDING = 28;
+const DEADLINE_DATE = { year: 2026, month: 11, day: 13 };
+const DAY_IN_MS = 86_400_000;
+const taipeiDatePartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const taipeiDateLabelFormatter = new Intl.DateTimeFormat("zh-TW", {
+  timeZone: "Asia/Taipei",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
+});
+const taipeiTimeLabelFormatter = new Intl.DateTimeFormat("zh-TW", {
+  timeZone: "Asia/Taipei",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+function countdownClockFor(now: Date): CountdownClock {
+  const parts = Object.fromEntries(
+    taipeiDatePartsFormatter
+      .formatToParts(now)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, Number(value)]),
+  );
+  const today = Date.UTC(parts.year, parts.month - 1, parts.day);
+  const deadline = Date.UTC(DEADLINE_DATE.year, DEADLINE_DATE.month - 1, DEADLINE_DATE.day);
+  return {
+    dateLabel: taipeiDateLabelFormatter.format(now),
+    timeLabel: taipeiTimeLabelFormatter.format(now),
+    daysRemaining: Math.max(0, Math.ceil((deadline - today) / DAY_IN_MS)),
+  };
+}
 
 // The southern port peninsula is presented as part of Qijin in this simplified
 // city overview. It overlays the narrow westward spur in the source Xiaogang
@@ -264,6 +307,14 @@ export default function SchoolMapDashboard() {
   const [progressModal, setProgressModal] = useState<ProgressKind | null>(null);
   const [progressLevel, setProgressLevel] = useState<SchoolLevelKey | null>(null);
   const [progressView, setProgressView] = useState<ProgressView>("completed");
+  const [countdownClock, setCountdownClock] = useState<CountdownClock | null>(null);
+
+  useEffect(() => {
+    const updateClock = () => setCountdownClock(countdownClockFor(new Date()));
+    updateClock();
+    const interval = window.setInterval(updateClock, 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -467,6 +518,15 @@ export default function SchoolMapDashboard() {
         <div className="topbar-pill" aria-live="polite">
           <span className={`status-dot status-${syncState}`} />
           {syncState === "loading" ? "同步資料中" : syncState === "synced" ? `已同步 · ${schools.length} 所` : syncState === "unavailable" ? `暫存資料 · ${schools.length} 所` : `資料共 ${schools.length} 所`}
+        </div>
+        <div className="deadline-widget" aria-live="polite" aria-label="目前日期時間與十一月十三日倒數">
+          <time className="deadline-current">
+            <span>{countdownClock?.dateLabel ?? "讀取時間中"}</span>
+            {countdownClock && <span>{countdownClock.timeLabel}</span>}
+          </time>
+          <span className="deadline-countdown">
+            距離 11/13 尚有 <strong>{countdownClock?.daysRemaining ?? "—"}</strong> 天
+          </span>
         </div>
       </header>
 

@@ -36,6 +36,44 @@ button, input, select { font: inherit; }
   backdrop-filter: blur(16px);
 }
 
+.deadline-widget {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+  min-width: 190px;
+  margin-left: 12px;
+  padding: 8px 12px;
+  border: 1px solid #d7e6e5;
+  border-radius: 13px;
+  background: #f4f9f8;
+  box-shadow: 0 6px 18px rgba(25, 74, 77, 0.06);
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.deadline-countdown {
+  color: var(--teal-dark);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.deadline-countdown strong {
+  color: #d66f2c;
+  font-size: 15px;
+  line-height: 1;
+}
+
 .brand-mark {
   display: grid;
   place-items: center;
@@ -1145,11 +1183,29 @@ footer a { color: var(--teal); font-weight: 700; text-underline-offset: 3px; }
 }
 
 @media (max-width: 640px) {
-  .topbar { min-height: 62px; padding: 10px 16px; }
-  .brand-mark { width: 38px; height: 38px; }
+  .topbar {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    min-height: 62px;
+    padding: 10px 16px;
+  }
+  .deadline-widget {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 116px;
+    margin: 0;
+    padding: 6px 8px;
+    justify-self: end;
+  }
+  .deadline-current { display: grid; justify-items: end; gap: 0; font-size: 8px; }
+  .deadline-countdown { font-size: 8px; }
+  .deadline-countdown strong { font-size: 13px; }
+  .brand-mark { grid-column: 1; grid-row: 1; width: 38px; height: 38px; margin-right: 0; }
+  .brand-copy { grid-column: 2; grid-row: 1; min-width: 0; }
   .brand-copy strong { font-size: 13px; }
   .brand-copy span { display: none; }
-  .topbar-pill { padding: 7px 9px; font-size: 10px; }
+  .topbar-pill { grid-column: 1 / -1; grid-row: 2; margin-left: 0; padding: 7px 9px; justify-self: end; font-size: 10px; }
   .hero { padding: 36px 16px 24px; }
   .hero h1 { font-size: 40px; }
   .hero-copy { font-size: 13px; }
