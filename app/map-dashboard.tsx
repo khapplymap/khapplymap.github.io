@@ -318,9 +318,13 @@ export default function SchoolMapDashboard() {
 
   useEffect(() => {
     let active = true;
+    let refreshInFlight = false;
     const controller = new AbortController();
 
     async function refreshSchools() {
+      if (refreshInFlight || document.visibilityState === "hidden") return;
+      refreshInFlight = true;
+
       try {
         const direct = schoolsFromGooglePayloads(await Promise.all(SHEET_TABS.map(async ({ name, kind }) => ({
           kind,
@@ -346,21 +350,26 @@ export default function SchoolMapDashboard() {
         } catch (fallbackError) {
           if (active && !(fallbackError instanceof DOMException && fallbackError.name === "AbortError")) setSyncState("unavailable");
         }
+      } finally {
+        refreshInFlight = false;
       }
     }
 
     void refreshSchools();
-    const interval = window.setInterval(refreshSchools, 30_000);
+    const interval = window.setInterval(refreshSchools, 10_000);
     const handleVisibility = () => {
       if (document.visibilityState === "visible") void refreshSchools();
     };
+    const handleFocus = () => void refreshSchools();
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       active = false;
       controller.abort();
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
