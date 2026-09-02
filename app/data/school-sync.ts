@@ -30,6 +30,11 @@ export type SheetKind = "existing" | "new";
 
 export const baselineSchools = schoolData as School[];
 
+const PROGRESS_FIELDS = new Set<keyof School>([
+  "existingImplementationProgress",
+  "newImplementationProgress",
+]);
+
 function normalized(value: unknown) {
   return String(value ?? "").trim().replace(/\s+/g, "");
 }
@@ -66,6 +71,12 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
     return value === null || value === undefined || String(value).trim() === "" ? undefined : value;
   };
 
+  const progressValueAt = (cells: GoogleCell[], index: number) => {
+    if (index < 0) return undefined;
+    const value = cells[index]?.v;
+    return value === null || value === undefined ? "" : String(value).trim();
+  };
+
   return (table.rows ?? []).flatMap((row, index) => {
     const cells = row.c ?? [];
     const name = String(valueAt(cells, indexes.name) ?? "").trim();
@@ -77,12 +88,12 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
       schoolCategory: valueAt(cells, indexes.schoolCategory) as string | undefined,
       deviceCategory: valueAt(cells, indexes.deviceCategory) as string | undefined,
       deviceQuantity: valueAt(cells, indexes.deviceQuantity) as number | string | undefined,
-      existingImplementationProgress: valueAt(cells, indexes.existingImplementationProgress) as string | undefined,
+      existingImplementationProgress: progressValueAt(cells, indexes.existingImplementationProgress),
       newDeviceCategory: valueAt(cells, indexes.newDeviceCategory) as string | undefined,
       newDeviceQuantity: valueAt(cells, indexes.newDeviceQuantity) as number | string | undefined,
       chargingCartSpec: valueAt(cells, indexes.chargingCartSpec) as string | undefined,
       chargingCartQuantity: valueAt(cells, indexes.chargingCartQuantity) as number | string | undefined,
-      newImplementationProgress: valueAt(cells, indexes.newImplementationProgress) as string | undefined,
+      newImplementationProgress: progressValueAt(cells, indexes.newImplementationProgress),
     }];
   });
 }
@@ -96,7 +107,9 @@ export function mergeSchools(remoteSchools: School[]) {
     const existing = byName.get(normalized(remote.name));
     if (existing) {
       const definedFields = Object.fromEntries(
-        Object.entries(remote).filter(([, value]) => value !== undefined && value !== ""),
+        Object.entries(remote).filter(([key, value]) =>
+          value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
+        ),
       ) as Partial<School>;
       Object.assign(existing, definedFields, { id: existing.id, district: remote.district || existing.district });
       matchedRows += 1;
@@ -125,7 +138,9 @@ export function schoolsFromGooglePayloads(sheets: Array<{ kind: SheetKind; paylo
       const key = normalized(school.name);
       const current = combinedByName.get(key);
       const definedFields = Object.fromEntries(
-        Object.entries(school).filter(([, value]) => value !== undefined && value !== ""),
+        Object.entries(school).filter(([key, value]) =>
+          value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
+        ),
       ) as Partial<School>;
       combinedByName.set(key, { ...(current ?? school), ...definedFields } as School);
     }
