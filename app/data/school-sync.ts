@@ -43,6 +43,14 @@ function normalizedHeader(value: unknown) {
   return normalized(value).replace(/[_\-（）()：:]/g, "").toLowerCase();
 }
 
+function definedSchoolFields(school: School) {
+  return Object.fromEntries(
+    Object.entries(school).filter(([key, value]) =>
+      value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
+    ),
+  ) as Partial<School>;
+}
+
 export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[] {
   const headers = (table.cols ?? []).map((column) => normalizedHeader(column.label));
   const findColumn = (...aliases: string[]) => {
@@ -106,11 +114,7 @@ export function mergeSchools(remoteSchools: School[]) {
   for (const remote of remoteSchools) {
     const existing = byName.get(normalized(remote.name));
     if (existing) {
-      const definedFields = Object.fromEntries(
-        Object.entries(remote).filter(([key, value]) =>
-          value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
-        ),
-      ) as Partial<School>;
+      const definedFields = definedSchoolFields(remote);
       Object.assign(existing, definedFields, { id: existing.id, district: remote.district || existing.district });
       matchedRows += 1;
       continue;
@@ -126,6 +130,29 @@ export function mergeSchools(remoteSchools: School[]) {
   return { schools: merged, matchedRows };
 }
 
+export function updateSchoolsFromGooglePayload(
+  currentSchools: School[],
+  kind: SheetKind,
+  payload: GoogleSheetPayload,
+) {
+  if (payload.status !== "ok" || !payload.table) throw new Error(`Google Sheets ${kind} query failed`);
+
+  const next = currentSchools.map((school) => ({ ...school }));
+  const byName = new Map(next.map((school) => [normalized(school.name), school]));
+  const remoteSchools = readRemoteSchools(payload.table, kind);
+
+  for (const remote of remoteSchools) {
+    const existing = byName.get(normalized(remote.name));
+    if (!existing) continue;
+    Object.assign(existing, definedSchoolFields(remote), {
+      id: existing.id,
+      district: remote.district || existing.district,
+    });
+  }
+
+  return next;
+}
+
 export function schoolsFromGooglePayloads(sheets: Array<{ kind: SheetKind; payload: GoogleSheetPayload }>) {
   const combinedByName = new Map<string, School>();
   let sheetRows = 0;
@@ -137,11 +164,7 @@ export function schoolsFromGooglePayloads(sheets: Array<{ kind: SheetKind; paylo
     for (const school of remoteSchools) {
       const key = normalized(school.name);
       const current = combinedByName.get(key);
-      const definedFields = Object.fromEntries(
-        Object.entries(school).filter(([key, value]) =>
-          value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
-        ),
-      ) as Partial<School>;
+      const definedFields = definedSchoolFields(school);
       combinedByName.set(key, { ...(current ?? school), ...definedFields } as School);
     }
   }

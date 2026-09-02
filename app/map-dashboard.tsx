@@ -5,6 +5,7 @@ import geoData from "./data/kaohsiung-districts.json";
 import {
   baselineSchools,
   schoolsFromGooglePayloads,
+  updateSchoolsFromGooglePayload,
   type GoogleSheetPayload,
   type School,
   type SheetKind,
@@ -320,8 +321,9 @@ export default function SchoolMapDashboard() {
     let active = true;
     let refreshInFlight = false;
     const controller = new AbortController();
+    const newDeviceTab = SHEET_TABS.find(({ kind }) => kind === "new")!;
 
-    async function refreshSchools() {
+    async function refreshAllSchools() {
       if (refreshInFlight || document.visibilityState === "hidden") return;
       refreshInFlight = true;
 
@@ -355,19 +357,40 @@ export default function SchoolMapDashboard() {
       }
     }
 
-    void refreshSchools();
-    const interval = window.setInterval(refreshSchools, 10_000);
+    async function refreshNewProgress() {
+      if (refreshInFlight || document.visibilityState === "hidden") return;
+      refreshInFlight = true;
+
+      try {
+        const payload = await loadGoogleSheet(newDeviceTab.name);
+        if (!active) return;
+        setSchools((current) => updateSchoolsFromGooglePayload(current, newDeviceTab.kind, payload));
+        setSelectedSchool((current) => current
+          ? updateSchoolsFromGooglePayload([current], newDeviceTab.kind, payload)[0] ?? current
+          : null);
+        setSyncState("synced");
+      } catch {
+        // 快速同步失敗時保留目前資料，下一輪會自動重試。
+      } finally {
+        refreshInFlight = false;
+      }
+    }
+
+    void refreshAllSchools();
+    const progressInterval = window.setInterval(refreshNewProgress, 2_000);
+    const fullInterval = window.setInterval(refreshAllSchools, 60_000);
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void refreshSchools();
+      if (document.visibilityState === "visible") void refreshAllSchools();
     };
-    const handleFocus = () => void refreshSchools();
+    const handleFocus = () => void refreshNewProgress();
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("focus", handleFocus);
 
     return () => {
       active = false;
       controller.abort();
-      window.clearInterval(interval);
+      window.clearInterval(progressInterval);
+      window.clearInterval(fullInterval);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", handleFocus);
     };
