@@ -42,6 +42,7 @@ const features = geoData.features as DistrictFeature[];
 const initialSchools = baselineSchools;
 const ALL_DISTRICTS = "全區";
 const SHEET_ID = "1QX5J-Ouq4zNDunI7slufWQRFG082ht0W9Zt3YJIXErk";
+const MEETING_DOC_URL = "https://docs.google.com/document/d/1LOMLNGA4kSyIN2R3KL_pRSdiTvUnQcqKEDJwY3k1TYE/preview?embedded=true";
 const SHEET_TABS: Array<{ name: string; kind: SheetKind }> = [
   { name: "既有載具", kind: "existing" },
   { name: "新載具", kind: "new" },
@@ -269,6 +270,14 @@ function SearchIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 2h2v2h6V2h2v2h2.25A2.75 2.75 0 0 1 22 6.75v12.5A2.75 2.75 0 0 1 19.25 22H4.75A2.75 2.75 0 0 1 2 19.25V6.75A2.75 2.75 0 0 1 4.75 4H7V2Zm12.25 8H4v9.25c0 .41.34.75.75.75h14.5c.41 0 .75-.34.75-.75V10h-.75ZM4.75 6a.75.75 0 0 0-.75.75V8h16V6.75a.75.75 0 0 0-.75-.75H17v2h-2V6H9v2H7V6H4.75Z" />
+    </svg>
+  );
+}
+
 function loadGoogleSheet(sheetName: string) {
   return new Promise<GoogleSheetPayload>((resolve, reject) => {
     const callbackName = `__kaohsiungSchoolSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -309,6 +318,7 @@ export default function SchoolMapDashboard() {
   const [progressLevel, setProgressLevel] = useState<SchoolLevelKey | null>(null);
   const [progressView, setProgressView] = useState<ProgressView>("completed");
   const [countdownClock, setCountdownClock] = useState<CountdownClock | null>(null);
+  const [meetingPanelOpen, setMeetingPanelOpen] = useState(false);
 
   useEffect(() => {
     const updateClock = () => setCountdownClock(countdownClockFor(new Date()));
@@ -316,6 +326,17 @@ export default function SchoolMapDashboard() {
     const interval = window.setInterval(updateClock, 1_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!meetingPanelOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [meetingPanelOpen]);
 
   useEffect(() => {
     let active = true;
@@ -544,9 +565,13 @@ export default function SchoolMapDashboard() {
       <header className="topbar">
         <div className="brand-mark"><SchoolIcon /></div>
         <div className="brand-copy">
-          <strong>高雄市載具施工進度追蹤圖</strong>
+          <strong>高雄市載具配送及施作進度追蹤圖</strong>
           <span>115 年中小學數位學習採購案</span>
         </div>
+        <button type="button" className="meeting-log-button" onClick={() => setMeetingPanelOpen(true)}>
+          <CalendarIcon />
+          每週會議紀錄
+        </button>
         <div className="topbar-pill" aria-live="polite">
           <span className={`status-dot status-${syncState}`} />
           {syncState === "loading" ? "同步資料中" : syncState === "synced" ? `已同步 · ${schools.length} 所` : syncState === "unavailable" ? `暫存資料 · ${schools.length} 所` : `資料共 ${schools.length} 所`}
@@ -865,6 +890,38 @@ export default function SchoolMapDashboard() {
           )}
         </aside>
       </section>
+
+      {meetingPanelOpen && (
+        <div
+          className="meeting-record-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setMeetingPanelOpen(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setMeetingPanelOpen(false);
+          }}
+        >
+          <section className="meeting-record-modal" role="dialog" aria-modal="true" aria-labelledby="meeting-record-title">
+            <button type="button" className="modal-close" aria-label="關閉每週會議紀錄" autoFocus onClick={() => setMeetingPanelOpen(false)}>×</button>
+            <header className="meeting-record-heading">
+              <span className="meeting-record-icon"><CalendarIcon /></span>
+              <div>
+                <h2 id="meeting-record-title">每週會議紀錄</h2>
+              </div>
+            </header>
+
+            <div className="meeting-document-frame">
+              <iframe
+                title="每週會議紀錄 Google 文件"
+                src={MEETING_DOC_URL}
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            </div>
+            <p className="meeting-document-note">文件內容會顯示在此視窗內，關閉後即可繼續查看施工進度。</p>
+          </section>
+        </div>
+      )}
 
       {progressModal && (
         <div
