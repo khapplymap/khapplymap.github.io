@@ -101,7 +101,9 @@ function normalizedHeader(value: unknown) {
 function definedSchoolFields(school: School) {
   return Object.fromEntries(
     Object.entries(school).filter(([key, value]) =>
-      value !== undefined && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
+      !["id", "name", "district"].includes(key)
+      && value !== undefined
+      && (value !== "" || PROGRESS_FIELDS.has(key as keyof School)),
     ),
   ) as Partial<School>;
 }
