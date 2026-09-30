@@ -9,6 +9,7 @@ import {
   type GoogleSheetPayload,
   type School,
   type SheetKind,
+  type EquipmentItem,
 } from "./data/school-sync";
 
 type Coordinate = [number, number];
@@ -236,6 +237,20 @@ function completionRateValue(completed: number, total: number) {
 function completionRate(completed: number, total: number) {
   const rate = completionRateValue(completed, total);
   return `${Number.isInteger(rate) ? rate.toFixed(0) : rate.toFixed(1)}%`;
+}
+
+function EquipmentItems({ items }: { items: EquipmentItem[] }) {
+  if (items.length === 0) return <span className="detail-pending">無配發</span>;
+  return (
+    <>
+      {items.map((item) => (
+        <span className="equipment-item" key={item.type}>
+          <small>{item.type}</small>
+          {item.quantity.toLocaleString("zh-TW")} 台
+        </span>
+      ))}
+    </>
+  );
 }
 
 function fillForCount(count: number) {
@@ -1040,27 +1055,35 @@ export default function SchoolMapDashboard() {
               <div>
                 <dt>新載具</dt>
                 <dd className="equipment-summary">
-                  <span className="equipment-item">
-                    <small>類型</small>
-                    {selectedSchool.newDeviceCategory ?? <span className="detail-pending">待補資料</span>}
-                  </span>
-                  <span className="equipment-item">
-                    <small>數量</small>
-                    {selectedSchool.newDeviceQuantity ?? <span className="detail-pending">待補資料</span>}
-                  </span>
+                  {selectedSchool.newDevices
+                    ? <EquipmentItems items={selectedSchool.newDevices} />
+                    : <>
+                        <span className="equipment-item">
+                          <small>類型</small>
+                          {selectedSchool.newDeviceCategory ?? <span className="detail-pending">待補資料</span>}
+                        </span>
+                        <span className="equipment-item">
+                          <small>數量</small>
+                          {selectedSchool.newDeviceQuantity ?? <span className="detail-pending">待補資料</span>}
+                        </span>
+                      </>}
                 </dd>
               </div>
               <div>
                 <dt>充電車</dt>
                 <dd className="equipment-summary">
-                  <span className="equipment-item">
-                    <small>類型</small>
-                    {selectedSchool.chargingCartSpec ?? <span className="detail-pending">待補資料</span>}
-                  </span>
-                  <span className="equipment-item">
-                    <small>數量</small>
-                    {selectedSchool.chargingCartQuantity ?? <span className="detail-pending">待補資料</span>}
-                  </span>
+                  {selectedSchool.chargingCarts
+                    ? <EquipmentItems items={selectedSchool.chargingCarts} />
+                    : <>
+                        <span className="equipment-item">
+                          <small>類型</small>
+                          {selectedSchool.chargingCartSpec ?? <span className="detail-pending">待補資料</span>}
+                        </span>
+                        <span className="equipment-item">
+                          <small>數量</small>
+                          {selectedSchool.chargingCartQuantity ?? <span className="detail-pending">待補資料</span>}
+                        </span>
+                      </>}
                 </dd>
               </div>
               <div>
