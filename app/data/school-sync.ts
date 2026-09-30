@@ -13,6 +13,13 @@ export type School = {
   chargingCartSpec?: string;
   chargingCartQuantity?: number | string;
   newImplementationProgress?: string;
+  newDevices?: EquipmentItem[];
+  chargingCarts?: EquipmentItem[];
+};
+
+export type EquipmentItem = {
+  type: string;
+  quantity: number;
 };
 
 type GoogleCell = { v?: unknown } | null;
@@ -37,6 +44,54 @@ const PROGRESS_FIELDS = new Set<keyof School>([
 
 function normalized(value: unknown) {
   return String(value ?? "").trim().replace(/\s+/g, "");
+}
+
+function schoolNameKey(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/（[^）]*）|\([^)]*\)/g, "")
+    .replace(/[\s·・‧,，.。()（）\-－_]/g, "")
+    .replace(/臺/g, "台")
+    .replace(/(?:學校)?財團法人/g, "")
+    .replace(/高雄市(?:私立|立)?/g, "")
+    .replace(/(?:市立|私立|公立)/g, "")
+    .replace(/女子高級中學/g, "女中")
+    .replace(/男子高級中學/g, "男中")
+    .replace(/高級家事商業職業學校/g, "家商")
+    .replace(/高級工業職業學校/g, "高工")
+    .replace(/高級商業職業學校/g, "高商")
+    .replace(/高級工商職業學校/g, "工商")
+    .replace(/高級藝術職業學校/g, "藝校")
+    .replace(/高級職業學校/g, "高職")
+    .replace(/高級中學|高中/g, "中學")
+    .replace(/國民中小學/g, "國中小")
+    .replace(/國民中學/g, "國中")
+    .replace(/國民小學/g, "國小")
+    .replace(/特殊教育學校|特殊學校/g, "特教學校");
+}
+
+function schoolCoreKey(value: unknown) {
+  return schoolNameKey(value)
+    .replace(/^(?:天主教|佛光山)/, "")
+    .replace(/(?:實驗中學|實驗學校|特教學校|國中小|中學|國中|國小|工商|家商|高工|高商|高職|藝校)$/, "")
+    .replace(/^立志志/, "立志")
+    .replace(/^(.{2,})\1/, "$1");
+}
+
+function matchingSchool(schools: School[], remote: School) {
+  const exact = schools.find((school) => normalized(school.name) === normalized(remote.name));
+  if (exact) return exact;
+
+  const nameKey = schoolNameKey(remote.name);
+  const sameName = schools.filter((school) => schoolNameKey(school.name) === nameKey);
+  if (sameName.length === 1) return sameName[0];
+  const sameDistrictName = sameName.find((school) => school.district === remote.district);
+  if (sameDistrictName) return sameDistrictName;
+
+  const coreKey = schoolCoreKey(remote.name);
+  const sameCore = schools.filter((school) => schoolCoreKey(school.name) === coreKey);
+  if (sameCore.length === 1) return sameCore[0];
+  return sameCore.find((school) => school.district === remote.district);
 }
 
 function normalizedHeader(value: unknown) {
@@ -69,6 +124,13 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
     newImplementationProgress: kind === "new" ? findColumn("新載具施作進度", "新載具進度", "施作進度") : -1,
     chargingCartSpec: findColumn("充電車類型", "充電車規格", "既有充電車類型"),
     chargingCartQuantity: findColumn("充電車數量", "充電車數"),
+    ipad: kind === "new" ? findColumn("iPad OS", "iPadOS", "iPad") : -1,
+    windows: kind === "new" ? findColumn("Windows", "Windows OS") : -1,
+    chromeOs: kind === "new" ? findColumn("Chrome OS", "ChromeOS", "Chromebook") : -1,
+    cart20U: kind === "new" ? findColumn("20U") : -1,
+    cart30To32U: kind === "new" ? findColumn("30-32U", "30～32U") : -1,
+    cart34To36U: kind === "new" ? findColumn("34-36U", "34～36U") : -1,
+    cart42U: kind === "new" ? findColumn("42U") : -1,
   };
 
   if (indexes.name < 0) return [];
@@ -85,10 +147,32 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
     return value === null || value === undefined ? "" : String(value).trim();
   };
 
+  const positiveNumberAt = (cells: GoogleCell[], index: number) => {
+    const value = valueAt(cells, index);
+    if (value === undefined) return 0;
+    const number = Number(String(value).replace(/,/g, "").trim());
+    return Number.isFinite(number) && number > 0 ? Math.round(number) : 0;
+  };
+
   return (table.rows ?? []).flatMap((row, index) => {
     const cells = row.c ?? [];
     const name = String(valueAt(cells, indexes.name) ?? "").trim();
     if (!name) return [];
+    const newDevices: EquipmentItem[] = kind === "new"
+      ? [
+          { type: "iPad", quantity: positiveNumberAt(cells, indexes.ipad) },
+          { type: "Windows", quantity: positiveNumberAt(cells, indexes.windows) },
+          { type: "Chromebook", quantity: positiveNumberAt(cells, indexes.chromeOs) },
+        ].filter((item) => item.quantity > 0)
+      : [];
+    const carts36U = positiveNumberAt(cells, indexes.cart30To32U) + positiveNumberAt(cells, indexes.cart34To36U);
+    const chargingCarts: EquipmentItem[] = kind === "new"
+      ? [
+          { type: "24U", quantity: positiveNumberAt(cells, indexes.cart20U) },
+          { type: "36U", quantity: carts36U },
+          { type: "42U", quantity: positiveNumberAt(cells, indexes.cart42U) },
+        ].filter((item) => item.quantity > 0)
+      : [];
     return [{
       id: index + 1,
       name,
@@ -102,17 +186,17 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
       chargingCartSpec: valueAt(cells, indexes.chargingCartSpec) as string | undefined,
       chargingCartQuantity: valueAt(cells, indexes.chargingCartQuantity) as number | string | undefined,
       newImplementationProgress: progressValueAt(cells, indexes.newImplementationProgress),
+      ...(kind === "new" ? { newDevices, chargingCarts } : {}),
     }];
   });
 }
 
 export function mergeSchools(remoteSchools: School[]) {
   const merged = baselineSchools.map((school) => ({ ...school }));
-  const byName = new Map(merged.map((school) => [normalized(school.name), school]));
   let matchedRows = 0;
 
   for (const remote of remoteSchools) {
-    const existing = byName.get(normalized(remote.name));
+    const existing = matchingSchool(merged, remote);
     if (existing) {
       const definedFields = definedSchoolFields(remote);
       Object.assign(existing, definedFields, { id: existing.id, district: remote.district || existing.district });
@@ -123,7 +207,6 @@ export function mergeSchools(remoteSchools: School[]) {
     if (remote.district) {
       const added = { ...remote, id: merged.length + 1 };
       merged.push(added);
-      byName.set(normalized(added.name), added);
     }
   }
 
@@ -138,11 +221,10 @@ export function updateSchoolsFromGooglePayload(
   if (payload.status !== "ok" || !payload.table) throw new Error(`Google Sheets ${kind} query failed`);
 
   const next = currentSchools.map((school) => ({ ...school }));
-  const byName = new Map(next.map((school) => [normalized(school.name), school]));
   const remoteSchools = readRemoteSchools(payload.table, kind);
 
   for (const remote of remoteSchools) {
-    const existing = byName.get(normalized(remote.name));
+    const existing = matchingSchool(next, remote);
     if (!existing) continue;
     Object.assign(existing, definedSchoolFields(remote), {
       id: existing.id,
