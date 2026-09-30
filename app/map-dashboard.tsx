@@ -567,6 +567,7 @@ export default function SchoolMapDashboard() {
         <div className="brand-copy">
           <strong>高雄市載具配送及施作進度追蹤圖</strong>
           <span>115 年中小學數位學習採購案</span>
+          <small className="source-note">資料來源：高雄載具資料庫（既有載具、新載具）</small>
         </div>
         <button type="button" className="meeting-log-button" onClick={() => setMeetingPanelOpen(true)}>
           <CalendarIcon />
