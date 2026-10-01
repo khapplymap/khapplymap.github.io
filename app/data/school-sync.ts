@@ -2,6 +2,7 @@ import schoolData from "./schools.json";
 
 export type School = {
   id: number;
+  code?: string;
   district: string;
   name: string;
   schoolCategory?: string;
@@ -79,17 +80,30 @@ function schoolCoreKey(value: unknown) {
 }
 
 function matchingSchool(schools: School[], remote: School) {
-  const exact = schools.find((school) => normalized(school.name) === normalized(remote.name));
+  if (remote.code) {
+    const sameCode = schools.find((school) => school.code === remote.code);
+    if (sameCode) return sameCode;
+  }
+
+  // A school that has already been bound to a distribution code must never
+  // accept a different row through fuzzy name matching (for example
+  // KH057 中山國中 and KH250 中山高中). Unbound baseline rows may still use
+  // their name once so the initial import can attach the authoritative code.
+  const candidates = remote.code
+    ? schools.filter((school) => !school.code)
+    : schools;
+
+  const exact = candidates.find((school) => normalized(school.name) === normalized(remote.name));
   if (exact) return exact;
 
   const nameKey = schoolNameKey(remote.name);
-  const sameName = schools.filter((school) => schoolNameKey(school.name) === nameKey);
+  const sameName = candidates.filter((school) => schoolNameKey(school.name) === nameKey);
   if (sameName.length === 1) return sameName[0];
   const sameDistrictName = sameName.find((school) => school.district === remote.district);
   if (sameDistrictName) return sameDistrictName;
 
   const coreKey = schoolCoreKey(remote.name);
-  const sameCore = schools.filter((school) => schoolCoreKey(school.name) === coreKey);
+  const sameCore = candidates.filter((school) => schoolCoreKey(school.name) === coreKey);
   if (sameCore.length === 1) return sameCore[0];
   return sameCore.find((school) => school.district === remote.district);
 }
@@ -115,6 +129,7 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
     return headers.findIndex((header) => candidates.includes(header));
   };
   const indexes = {
+    code: findColumn("編號", "學校編號", "代碼"),
     name: findColumn("學校名稱", "學校", "校名"),
     district: findColumn("行政區", "所屬行政區", "區域"),
     schoolCategory: findColumn("學校類別", "學校類型"),
@@ -177,6 +192,7 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
       : [];
     return [{
       id: index + 1,
+      code: String(valueAt(cells, indexes.code) ?? "").trim() || undefined,
       name,
       district: String(valueAt(cells, indexes.district) ?? "").trim(),
       schoolCategory: valueAt(cells, indexes.schoolCategory) as string | undefined,
