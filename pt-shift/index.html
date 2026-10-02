@@ -39,7 +39,7 @@ select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;backgr
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let workers=[],tasks=[],signups=[];
+let workers=[],tasks=[],signups=[],holidayDates=new Set();
 
 function clean(v){return String(v==null?"":v).trim()}
 function esc(v){return clean(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]})}
@@ -87,9 +87,21 @@ function isCurrentOrFutureTask(row){
   if(!d)return true;
   return d>=taipeiToday();
 }
+function dateKey(d){
+  if(!d)return "";
+  return d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getDate()).padStart(2,"0");
+}
+function isHolidayTask(row){
+  const d=taskDate(row["日期"]);
+  if(!d)return false;
+  const day=d.getDay();
+  return day===0 || day===6 || holidayDates.has(dateKey(d));
+}
 function isTaskOpen(row){
   const openRaw=clean(row["開放時間"]);
   if(!openRaw)return true;
+
+  if(isHolidayTask(row))return false;
 
   const d=taskDate(row["日期"]);
   const clock=parseClock(openRaw);
@@ -146,10 +158,20 @@ async function loadAll(){
     const rs=await Promise.all([
       csvSheet("工讀生名單"),
       csvSheet("工作任務"),
-      csvSheet("報名紀錄")
+      csvSheet("報名紀錄"),
+      csvSheet("假日設定")
     ]);
 
-    const wr=rs[0],tr=rs[1],sr=rs[2];
+    const wr=rs[0],tr=rs[1],sr=rs[2],hr=rs[3];
+
+    holidayDates=new Set(
+      hr.slice(1).map(function(r){
+        const raw=clean(r[0]);
+        const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+        if(!m)return "";
+        return m[1]+"/"+String(Number(m[2])).padStart(2,"0")+"/"+String(Number(m[3])).padStart(2,"0");
+      }).filter(Boolean)
+    );
 
     workers=wr.slice(1).map(function(r){return clean(r[0])}).filter(Boolean);
 
@@ -188,6 +210,7 @@ function render(){
     const people=signups.filter(function(s){return k(s)===k(t)});
     const opened=isTaskOpen(t);
     const openTime=clean(t["開放時間"]);
+    const holidayLocked=!!openTime&&isHolidayTask(t);
     const opts='<option value="">請選擇姓名</option>'+workers.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join("");
     const peopleHtml=people.length?people.map(function(p){return '<div class="person"><strong>'+esc(p["姓名"])+'</strong><span class="ptime">'+esc(p["可出勤到幾點"])+'</span></div>'}).join(""):'<div class="empty">目前尚無人登記</div>';
     return '<section class="card">'+
@@ -196,7 +219,7 @@ function render(){
       (t["時間"]?'<span class="pill">開始 '+esc(t["時間"])+'</span>':'')+
       (t["人數"]?'<span class="pill">需求 '+esc(t["人數"])+' 人</span>':'')+
       '</div></div></div>'+
-      (!opened&&openTime?'<div class="locked">'+esc(openTime)+' 開放報名</div>':'')+
+      (!opened&&openTime?'<div class="locked">'+(holidayLocked?'假日不開放報名':esc(openTime)+' 開放報名')+'</div>':'')+
       '<hr><label>姓名</label><select id="name_'+i+'" onchange="syncExisting('+i+')" '+(!opened?'disabled':'')+'>'+opts+'</select>'+
       '<div id="hint_'+i+'" class="hint">如果之前已登記，重新選擇姓名即可修改時間</div>'+
       '<label>可出勤到幾點</label>'+
@@ -208,7 +231,7 @@ function render(){
         return '<option value="'+v+'">'+v+'</option>';
       }).join("")+
       '</select>'+
-      '<button class="btn" id="btn_'+i+'" onclick="submitSignup('+i+')" '+(!opened?'disabled':'')+'>'+(!opened?'尚未開放報名':'確認可以上班')+'</button>'+
+      '<button class="btn" id="btn_'+i+'" onclick="submitSignup('+i+')" '+(!opened?'disabled':'')+'>'+(!opened?(holidayLocked?'假日不開放報名':'尚未開放報名'):'確認可以上班')+'</button>'+
       '<button class="cancel-btn" id="cancel_'+i+'" onclick="cancelSignup('+i+')">取消出勤</button>'+
       
       '</section>';
@@ -257,7 +280,10 @@ function syncExisting(i){
 
 async function submitSignup(i){
   const t=tasks[i];
-  if(!isTaskOpen(t))return show((clean(t["開放時間"])||"指定時間")+" 後才開放報名","err");
+  if(!isTaskOpen(t)){
+    if(clean(t["開放時間"])&&isHolidayTask(t))return show("假日不開放下午時段報名","err");
+    return show((clean(t["開放時間"])||"指定時間")+" 後才開放報名","err");
+  }
   const name=clean(document.getElementById("name_"+i).value);
   const until=clean(document.getElementById("until_"+i).value);
   if(!name)return show("請先選擇姓名","err");
