@@ -174,7 +174,7 @@
         >
       </div>
 
-      <button onclick="loadData()">重新整理</button>
+      <div><label>狀態</label><select id="statusFilter" onchange="render()"><option value="active">已報名</option><option value="cancelled">已取消</option><option value="all">全部</option></select></div><button onclick="loadData()">重新整理</button>
     </div>
 
     <div id="summary" class="summary">載入中…</div>
@@ -328,28 +328,26 @@
         ).value
       ).toLowerCase();
 
+      const statusFilter = document.getElementById("statusFilter").value;
+
       const filtered = rows.filter(
         function (record) {
           const dateMatches =
             !dateFilter ||
-            clean(
-              record["日期"]
-            )
-              .toLowerCase()
-              .includes(dateFilter);
+            clean(record["日期"]).toLowerCase().includes(dateFilter);
 
           const placeMatches =
             !placeFilter ||
-            clean(
-              record["地點"]
-            )
-              .toLowerCase()
-              .includes(placeFilter);
+            clean(record["地點"]).toLowerCase().includes(placeFilter);
 
-          return (
-            dateMatches &&
-            placeMatches
-          );
+          const status = clean(record["狀態"]);
+          const active = !status || status === "已報名";
+          const statusMatches =
+            statusFilter === "all" ||
+            (statusFilter === "active" && active) ||
+            (statusFilter === "cancelled" && status === "已取消");
+
+          return dateMatches && placeMatches && statusMatches;
         }
       );
 
@@ -413,11 +411,13 @@
                 ) +
                 "</td>" +
                 "<td>" +
-                esc(
-                  record[
-                    "填寫時間"
-                  ]
-                ) +
+                esc(record["填寫時間"]) +
+                "</td>" +
+                "<td>" +
+                esc(clean(record["狀態"]) || "已報名") +
+                "</td>" +
+                "<td>" +
+                esc(record["取消時間"]) +
                 "</td>" +
                 "</tr>"
               );
@@ -446,7 +446,7 @@
             "<tr>" +
             "<th>姓名</th>" +
             "<th>可出勤到</th>" +
-            "<th>填寫時間</th>" +
+            "<th>填寫時間</th><th>狀態</th><th>取消時間</th>" +
             "</tr>" +
             "</thead>" +
 
