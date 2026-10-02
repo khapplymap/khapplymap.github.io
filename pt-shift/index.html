@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2248";
+const BUILD_VERSION="20261002-2255";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -115,6 +115,12 @@ function timeMinutes(timeText){
   return Number(m[1])*60+Number(m[2]);
 }
 
+function timeMinutes(timeText){
+  const m=clean(timeText).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return null;
+  return Number(m[1])*60+Number(m[2]);
+}
+
 function groupTasks(rows){
   const map=new Map();
   rows.forEach(t=>{
@@ -130,7 +136,6 @@ function groupTasks(rows){
         date,
         rawTime,
         displayTime,
-        mode:isAfternoon?"下午":"一般",
         isAfternoon,
         schools:[],
         headcount:""
@@ -139,12 +144,15 @@ function groupTasks(rows){
 
     const g=map.get(k);
     const school=clean(t["地點"]);
-    if(school) g.schools.push({school,time:displayTime,isAfternoon});
+    if(school) g.schools.push({school,time:displayTime});
 
     const n=Number(clean(t["人數"]));
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
   });
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a,b)=>{
+    if(a.date!==b.date) return a.date.localeCompare(b.date,"zh-Hant");
+    return (timeMinutes(a.rawTime)||0)-(timeMinutes(b.rawTime)||0);
+  });
 }
 
 function groupPeople(group){
@@ -173,8 +181,59 @@ function groupPeople(group){
 
 function scheduleTitle(dateText){
   const d=clean(dateText);
-  if(d==="10/10") return "10/10（五）排班";
   return d ? d+" 排班" : "排班";
+}
+
+const TW_HOLIDAYS_2026=new Set([
+  "2026-01-01",
+  "2026-02-14","2026-02-15","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-21","2026-02-22",
+  "2026-02-28",
+  "2026-04-03","2026-04-04","2026-04-05","2026-04-06",
+  "2026-05-01",
+  "2026-06-19","2026-06-20","2026-06-21",
+  "2026-09-25","2026-09-26","2026-09-27","2026-09-28",
+  "2026-10-10","2026-10-11","2026-10-12"
+]);
+
+function taipeiNowParts(){
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Taipei",
+    year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",hourCycle:"h23",
+    weekday:"short"
+  }).formatToParts(new Date());
+  const o={};
+  parts.forEach(p=>o[p.type]=p.value);
+  return o;
+}
+
+function taskIsoDate(dateText){
+  const m=clean(dateText).match(/^(\d{1,2})\/(\d{1,2})$/);
+  if(!m) return "";
+  const now=taipeiNowParts();
+  return now.year+"-"+String(Number(m[1])).padStart(2,"0")+"-"+String(Number(m[2])).padStart(2,"0");
+}
+
+function isWeekendIso(iso){
+  if(!iso) return false;
+  const d=new Date(iso+"T00:00:00+08:00");
+  const day=d.getUTCDay();
+  return day===0||day===6;
+}
+
+function afternoonSignupState(group){
+  if(!group.isAfternoon) return {open:true,reason:""};
+  const iso=taskIsoDate(group.date);
+  const now=taipeiNowParts();
+  const today=now.year+"-"+now.month+"-"+now.day;
+
+  if(isWeekendIso(iso)) return {open:false,reason:"假日不開放報名"};
+  if(TW_HOLIDAYS_2026.has(iso)) return {open:false,reason:"國定假日不開放報名"};
+  if(iso!==today) return {open:false,reason:"下午班將於當天 11:30 開放報名"};
+
+  const mins=Number(now.hour)*60+Number(now.minute);
+  if(mins<11*60+30) return {open:false,reason:"下午班將於 11:30 開放報名"};
+  return {open:true,reason:""};
 }
 
 function parseCsv(text){
@@ -283,9 +342,7 @@ function render(){
       :'<div class="empty">目前尚無人登記</div>';
 
     const schoolsHtml=g.schools.map(x=>
-      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+
-      (x.isAfternoon?' <span style="font-size:13px;color:#6b7280;font-weight:700">（下午班）</span>':'')+
-      '</div>'
+      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
     ).join("");
 
     return '<section class="card">'+
@@ -298,18 +355,25 @@ function render(){
       '</div><div class="count">已登記 '+people.length+
       (g.headcount?'/'+esc(g.headcount):'')+
       '</div></div>'+
-      (!g.isAfternoon
-        ? '<hr>'+
-          '<label>姓名</label>'+
-          '<select id="name_'+i+'">'+opts+'</select>'+
-          '<label>可出勤到幾點</label>'+
-          '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
-          '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
-          '<hr>'+
-          '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
-          '<div class="people">'+peopleHtml+'</div>'
-        : '<hr><div class="notice" style="display:block;background:#f9fafb;color:#6b7280">下午班不開放自行報名</div>'
-      )+
+      (()=>{
+        const state=afternoonSignupState(g);
+        if(state.open){
+          return '<hr>'+
+            '<label>姓名</label>'+
+            '<select id="name_'+i+'">'+opts+'</select>'+
+            '<label>可出勤到幾點</label>'+
+            '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
+            '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+            '<hr>'+
+            '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
+            '<div class="people">'+peopleHtml+'</div>';
+        }
+        return '<hr>'+
+          '<div class="notice" style="display:block;background:#f9fafb;color:#6b7280">'+esc(state.reason)+'</div>'+
+          '<div style="font-weight:800;margin:14px 0 6px">目前可出勤人員</div>'+
+          '<div class="people">'+peopleHtml+'</div>';
+      })()+
+      '</section>';
       '</section>';
   }).join("");
 }
