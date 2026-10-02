@@ -42,6 +42,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
 </main>
 <script>
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
+const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
 const clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -64,19 +65,60 @@ function scheduleTitle(dateText){
   return d ? d+" 排班" : "排班";
 }
 
+
+function parseCsv(text){
+  const rows=[];
+  let row=[],cell="",quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i],next=text[i+1];
+    if(ch==='"'){
+      if(quoted&&next==='"'){cell+='"';i++;}
+      else quoted=!quoted;
+    }else if(ch===","&&!quoted){
+      row.push(cell);cell="";
+    }else if((ch==="\n"||ch==="\r")&&!quoted){
+      if(ch==="\r"&&next==="\n")i++;
+      row.push(cell);rows.push(row);row=[];cell="";
+    }else{
+      cell+=ch;
+    }
+  }
+  if(cell.length||row.length){row.push(cell);rows.push(row);}
+  return rows;
+}
+
+async function readSheet(sheetName){
+  const url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+
+    "/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(sheetName)+"&_="+Date.now();
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const r=await fetch(url,{cache:"no-store",signal:controller.signal});
+    if(!r.ok) throw new Error(sheetName+" 讀取失敗");
+    const rows=parseCsv(await r.text());
+    const headers=(rows[0]||[]).map(clean);
+    return rows.slice(1).map(row=>{
+      const o={};
+      headers.forEach((h,i)=>o[h]=clean(row[i]));
+      return o;
+    });
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
-    const r=await fetch(API+"?action=load&_="+Date.now(),{cache:"no-store"});
-    const data=await r.json();
+    const [workerRows,taskRows,signupRows]=await Promise.all([
+      readSheet("工讀生名單"),
+      readSheet("工作任務"),
+      readSheet("報名紀錄")
+    ]);
 
-    if(!data.success){
-      throw new Error(data.error||"讀取失敗");
-    }
-
-    workers=Array.isArray(data.workers)?data.workers.map(clean).filter(Boolean):[];
-    tasks=Array.isArray(data.tasks)?data.tasks:[];
-    signups=Array.isArray(data.signups)?data.signups:[];
+    workers=workerRows.map(r=>clean(r["姓名"])).filter(Boolean);
+    tasks=taskRows.filter(r=>clean(r["日期"])&&clean(r["地點"]));
+    signups=signupRows.filter(r=>clean(r["姓名"]));
 
     render();
 
@@ -85,8 +127,8 @@ async function loadAll(){
   }catch(e){
     document.getElementById("status").textContent="同步失敗";
     document.getElementById("content").innerHTML=
-      '<div class="card empty">目前無法讀取排班資料</div>';
-    show(e.message||"讀取失敗","error");
+      '<div class="card empty">目前無法讀取排班資料，請按「重新整理」再試一次。</div>';
+    show((e&&e.name==="AbortError")?"同步逾時，請重新整理":(e.message||"讀取失敗"),"error");
   }
 }
 
@@ -159,8 +201,9 @@ async function submitSignup(i){
   btn.textContent="送出中…";
 
   try{
-    const r=await fetch(API,{
+    await fetch(API,{
       method:"POST",
+      mode:"no-cors",
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify({
         action:"signup",
@@ -171,13 +214,8 @@ async function submitSignup(i){
       })
     });
 
-    const result=await r.json();
-
-    if(!result.success){
-      throw new Error(result.error||"送出失敗");
-    }
-
-    show(result.updated?"已更新你的可出勤時間":"已完成登記","ok");
+    show("已送出登記","ok");
+    await new Promise(r=>setTimeout(r,900));
     await loadAll();
   }catch(e){
     show(e.message||"送出失敗","error");
