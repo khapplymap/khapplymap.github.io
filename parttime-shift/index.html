@@ -63,12 +63,23 @@ async function readSheet(name){
     return o;
   });
 }
+async function readWorkers(){
+  const url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:json&headers=0&sheet="+encodeURIComponent("工讀生名單")+"&range=A1:A&_="+Date.now();
+  const r=await fetch(url,{cache:"no-store"});
+  const t=await r.text();
+  const start=t.indexOf("("),end=t.lastIndexOf(")");
+  if(start<0||end<0)throw Error("無法讀取工讀生名單");
+  const j=JSON.parse(t.slice(start+1,end));
+  return (j.table.rows||[])
+    .map(row=>clean(row.c?.[0]?.f??row.c?.[0]?.v??""))
+    .filter(v=>v&&v!=="姓名");
+}
 function key(o){return clean(o["日期"])+"||"+clean(o["地點"])}
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
-    const [w,t,s]=await Promise.all([readSheet("工讀生名單"),readSheet("工作任務"),readSheet("報名紀錄")]);
-    workers=w.map(row=>clean(row["姓名"]||row["_col0"]||Object.values(row)[0])).filter(Boolean);
+    const [w,t,s]=await Promise.all([readWorkers(),readSheet("工作任務"),readSheet("報名紀錄")]);
+    workers=w;
     tasks=t.filter(row=>clean(row["日期"])&&clean(row["地點"]));
     signups=s.filter(row=>clean(row["姓名"]));
     render();
