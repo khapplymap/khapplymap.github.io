@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2225";
+const BUILD_VERSION="20261002-2228";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -291,6 +291,9 @@ function render(){
       '<label>可出勤到幾點</label>'+
       '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
       '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+      '<hr>'+
+      '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
+      '<div class="people">'+peopleHtml+'</div>'+
       '</section>';
   }).join("");
 }
