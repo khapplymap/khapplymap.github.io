@@ -35,7 +35,7 @@ h1{margin:0;font-size:32px}.sub{color:var(--muted);margin-top:6px}.topbar{displa
 </main>
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
-let workers=[],tasks=[],signups=[],rerollNonce={};
+let workers=[],tasks=[],signups=[],rerollNonce={},manualOverrides={};
 const clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function maskName(name){const s=clean(name);if(!s)return"";if(s.length===1)return s;if(s.length===2)return s[0]+"○";return s[0]+"○".repeat(s.length-2)+s[s.length-1]}
@@ -123,6 +123,54 @@ function allocate(group,people){
   const standby=[...men,...women,...other];
   return {assigned,standby,totalNeed};
 }
+function assignmentChoices(group,current){
+  const opts=['<option value="候補"'+(current==="候補"?' selected':'')+'>候補</option>'];
+  group.schools.forEach(s=>{
+    opts.push('<option value="'+esc(s.name)+'"'+(current===s.name?' selected':'')+'>'+esc(s.name)+'</option>');
+  });
+  return opts.join("");
+}
+
+function applyManualOverrides(group,result){
+  const all=[];
+  result.assigned.forEach(b=>b.people.forEach(p=>all.push({person:p,place:b.school})));
+  result.standby.forEach(p=>all.push({person:p,place:"候補"}));
+
+  const overrides=manualOverrides[group.key]||{};
+  all.forEach(x=>{
+    if(overrides[x.person.name]) x.place=overrides[x.person.name];
+  });
+
+  const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]}));
+  const standby=[];
+  all.forEach(x=>{
+    if(x.place==="候補"){standby.push(x.person);return;}
+    const box=assigned.find(b=>b.school===x.place);
+    if(box) box.people.push(x.person);
+    else standby.push(x.person);
+  });
+  return {assigned,standby,totalNeed:result.totalNeed};
+}
+
+function setManual(groupKey,name,place){
+  if(!manualOverrides[groupKey]) manualOverrides[groupKey]={};
+  manualOverrides[groupKey][name]=place;
+  render();
+}
+
+function manualPersonHtml(group,p,current){
+  const moveClass=p.move==="可"?"ok":p.move==="注意"?"warn":"";
+  return '<div class="person" style="grid-template-columns:minmax(90px,1.2fr) 54px 90px 90px minmax(120px,1.1fr)">'+
+    '<div class="name">'+esc(maskName(p.name))+'</div>'+
+    '<div class="sex">'+esc(p.sex)+'</div>'+
+    '<div class="until">'+esc(p.until||"-")+'</div>'+
+    '<div class="move '+moveClass+'">'+esc(p.move?("搬運："+p.move):"")+'</div>'+
+    '<select onchange="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',this.value)" style="height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 8px;background:#fff">'+
+      assignmentChoices(group,current)+
+    '</select>'+
+  '</div>';
+}
+
 function personHtml(p){
   const moveClass=p.move==="可"?"ok":p.move==="注意"?"warn":"";
   return '<div class="person"><div class="name">'+esc(maskName(p.name))+'</div><div class="sex">'+esc(p.sex)+'</div><div class="until">'+esc(p.until||"-")+'</div><div class="move '+moveClass+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div>';
@@ -130,24 +178,25 @@ function personHtml(p){
 function render(){
   const root=document.getElementById("content"),groups=buildGroups();
   root.innerHTML=groups.map(g=>{
-    const people=peopleFor(g),result=allocate(g,people);
+    const people=peopleFor(g),baseResult=allocate(g,people),result=baseResult?applyManualOverrides(g,baseResult):null;
     if(!result)return '<section class="card"><div class="head"><div><div class="title">'+esc(g.date+' '+g.time)+'</div></div></div><div class="empty">此班次尚未設定各校需求人數，暫不產生分配預覽。</div></section>';
     const schools=result.assigned.map(b=>{
       const m=b.people.filter(p=>p.sex==="男").length,f=b.people.filter(p=>p.sex==="女").length,mv=b.people.filter(p=>p.move==="可").length;
       return '<div class="school"><div class="school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div>'+
         '<div class="ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+
-        (b.people.length?b.people.map(personHtml).join(""):'<div class="empty">尚無人員</div>')+
+        (b.people.length?b.people.map(p=>manualPersonHtml(g,p,b.school)).join(""):'<div class="empty">尚無人員</div>')+
         '</div>';
     }).join("");
-    const standby=result.standby.length?'<div class="standby"><div class="standby-title">候補 '+result.standby.length+' 人</div>'+result.standby.map(personHtml).join("")+'</div>':'';
+    const standby=result.standby.length?'<div class="standby"><div class="standby-title">候補 '+result.standby.length+' 人</div>'+result.standby.map(p=>manualPersonHtml(g,p,"候補")).join("")+'</div>':'';
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
     return '<section class="card"><div class="head"><div><div class="title">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="meta"><span class="pill">報名 '+people.length+' 人</span><span class="pill">需求 '+result.totalNeed+' 人</span><span class="pill">男 '+totalM+' / 女 '+totalF+'</span></div></div><div class="summary">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+
       '<div class="schools">'+schools+'</div>'+standby+
-      '<div class="actions"><button class="btn btn-light" onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button class="btn btn-dark" disabled>確認分配（測試版）</button></div>'+
-      '<div class="note">目前只做預覽，不會寫回 Google Sheet。你確認分配方式沒問題後，再開啟正式「確認分配」。</div></section>';
+      '<div class="actions"><button class="btn btn-light" onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button class="btn btn-light" onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button class="btn btn-dark" disabled>確認分配（測試版）</button></div>'+
+      '<div class="note">目前可手動調配任一人員到指定學校或候補；這些變更仍只停留在預覽，不會寫回 Google Sheet。</div></section>';
   }).join("");
 }
-function reroll(key){rerollNonce[key]=(rerollNonce[key]||0)+1;render()}
+function reroll(key){rerollNonce[key]=(rerollNonce[key]||0)+1;manualOverrides[key]={};render()}
+function resetManual(key){manualOverrides[key]={};render()}
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
