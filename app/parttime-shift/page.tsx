@@ -25,7 +25,7 @@ async function readSheet(sheetName: string): Promise<Row[]> {
   if (!response.ok) throw new Error("無法讀取 " + sheetName);
 
   const text = await response.text();
-  const match = text.match(/setResponse\((.*)\);?\s*$/s);
+  const match = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
   if (!match) throw new Error("Google Sheet 回傳格式錯誤");
 
   const data = JSON.parse(match[1]);
