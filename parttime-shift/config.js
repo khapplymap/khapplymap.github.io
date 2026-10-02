@@ -1,0 +1,1 @@
+window.PARTTIME_SHIFT_API = "";\n
