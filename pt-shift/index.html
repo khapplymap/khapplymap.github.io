@@ -43,6 +43,30 @@ let workers=[],tasks=[],signups=[];
 
 function clean(v){return String(v==null?"":v).trim()}
 function esc(v){return clean(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]})}
+function taipeiToday(){
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+  const y=Number(parts.find(p=>p.type==="year").value);
+  const m=Number(parts.find(p=>p.type==="month").value);
+  const d=Number(parts.find(p=>p.type==="day").value);
+  return new Date(y,m-1,d);
+}
+function taskDate(raw){
+  const s=clean(raw);
+  if(!s)return null;
+  let m=s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+  if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})$/);
+  if(m){
+    const today=taipeiToday();
+    return new Date(today.getFullYear(),Number(m[1])-1,Number(m[2]));
+  }
+  return null;
+}
+function isCurrentOrFutureTask(row){
+  const d=taskDate(row["日期"]);
+  if(!d)return true;
+  return d>=taipeiToday();
+}
 function show(msg,type){
   const n=document.getElementById("notice");
   n.textContent=msg;
@@ -88,7 +112,7 @@ async function loadAll(){
     const th=(tr[0]||[]).map(clean);
     tasks=tr.slice(1).map(function(r){
       const o={}; th.forEach(function(h,i){o[h]=clean(r[i])}); return o;
-    }).filter(function(o){return o["日期"]&&o["地點"]});
+    }).filter(function(o){return o["日期"]&&o["地點"]&&isCurrentOrFutureTask(o)});
 
     const sh=(sr[0]||[]).map(clean);
     signups=sr.slice(1).map(function(r){
