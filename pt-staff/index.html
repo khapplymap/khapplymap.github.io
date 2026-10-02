@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>工讀出勤名單</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f6f7fb;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Noto Sans TC",
+        sans-serif;
+      color: #111827;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    .sub {
+      margin: 6px 0 20px;
+      color: #6b7280;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 0 12px;
+      font-size: 15px;
+      background: #fff;
+    }
+
+    button {
+      height: 44px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 12px;
+      padding: 0 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .summary {
+      color: #6b7280;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 26px rgba(17, 24, 39, 0.05);
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .place {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .date {
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .count {
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+
+    th,
+    td {
+      padding: 11px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .empty {
+      text-align: center;
+      color: #6b7280;
+      padding: 24px;
+    }
+
+    @media (max-width: 700px) {
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 14px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>工讀出勤名單</h1>
+    <div class="sub">正職人員／人資使用</div>
+
+    <div class="filters">
+      <div>
+        <label>日期</label>
+        <input
+          id="dateFilter"
+          placeholder="例如 10/4"
+          oninput="render()"
+        >
+      </div>
+
+      <div>
+        <label>學校</label>
+        <input
+          id="placeFilter"
+          placeholder="輸入學校名稱"
+          oninput="render()"
+        >
+      </div>
+
+      <button onclick="loadData()">重新整理</button>
+    </div>
+
+    <div id="summary" class="summary">載入中…</div>
+
+    <div id="list">
+      <div class="card empty">載入資料中…</div>
+    </div>
+  </main>
+
+  <script>
+    const SHEET_ID =
+      "1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
+
+    let rows = [];
+
+    function clean(value) {
+      return String(value == null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      return clean(value).replace(
+        /[&<>"']/g,
+        function (char) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+          }[char];
+        }
+      );
+    }
+
+    function parseCsv(text) {
+      const result = [];
+      let row = [];
+      let cell = "";
+      let quoted = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (quoted && next === '"') {
+            cell += '"';
+            i++;
+          } else {
+            quoted = !quoted;
+          }
+        } else if (char === "," && !quoted) {
+          row.push(cell);
+          cell = "";
+        } else if (
+          (char === "\n" || char === "\r") &&
+          !quoted
+        ) {
+          if (char === "\r" && next === "\n") {
+            i++;
+          }
+
+          row.push(cell);
+          result.push(row);
+
+          row = [];
+          cell = "";
+        } else {
+          cell += char;
+        }
+      }
+
+      if (cell.length || row.length) {
+        row.push(cell);
+        result.push(row);
+      }
+
+      return result;
+    }
+
+    async function loadData() {
+      document.getElementById("summary").textContent =
+        "同步中…";
+
+      try {
+        const url =
+          "https://docs.google.com/spreadsheets/d/" +
+          SHEET_ID +
+          "/gviz/tq?tqx=out:csv&sheet=" +
+          encodeURIComponent("報名紀錄") +
+          "&_=" +
+          Date.now();
+
+        const response = await fetch(url, {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error("讀取失敗");
+        }
+
+        const csv = parseCsv(
+          await response.text()
+        );
+
+        const headers = (csv[0] || []).map(clean);
+
+        rows = csv
+          .slice(1)
+          .map(function (row) {
+            const record = {};
+
+            headers.forEach(
+              function (header, index) {
+                record[header] =
+                  clean(row[index]);
+              }
+            );
+
+            return record;
+          })
+          .filter(function (record) {
+            return record["姓名"];
+          });
+
+        render();
+      } catch (error) {
+        document.getElementById(
+          "summary"
+        ).textContent = "同步失敗";
+
+        document.getElementById(
+          "list"
+        ).innerHTML =
+          '<div class="card empty">' +
+          "目前無法讀取出勤名單" +
+          "</div>";
+      }
+    }
+
+    function render() {
+      const dateFilter = clean(
+        document.getElementById(
+          "dateFilter"
+        ).value
+      ).toLowerCase();
+
+      const placeFilter = clean(
+        document.getElementById(
+          "placeFilter"
+        ).value
+      ).toLowerCase();
+
+      const filtered = rows.filter(
+        function (record) {
+          const dateMatches =
+            !dateFilter ||
+            clean(
+              record["日期"]
+            )
+              .toLowerCase()
+              .includes(dateFilter);
+
+          const placeMatches =
+            !placeFilter ||
+            clean(
+              record["地點"]
+            )
+              .toLowerCase()
+              .includes(placeFilter);
+
+          return (
+            dateMatches &&
+            placeMatches
+          );
+        }
+      );
+
+      document.getElementById(
+        "summary"
+      ).textContent =
+        "共 " +
+        filtered.length +
+        " 筆出勤登記";
+
+      const groups = {};
+
+      filtered.forEach(
+        function (record) {
+          const key =
+            clean(record["日期"]) +
+            "||" +
+            clean(record["地點"]);
+
+          if (!groups[key]) {
+            groups[key] = [];
+          }
+
+          groups[key].push(record);
+        }
+      );
+
+      const keys = Object.keys(groups);
+
+      const list =
+        document.getElementById(
+          "list"
+        );
+
+      if (!keys.length) {
+        list.innerHTML =
+          '<div class="card empty">' +
+          "沒有符合條件的資料" +
+          "</div>";
+
+        return;
+      }
+
+      list.innerHTML = keys
+        .map(function (key) {
+          const group = groups[key];
+          const first = group[0];
+
+          const people = group
+            .map(function (record) {
+              return (
+                "<tr>" +
+                "<td>" +
+                esc(record["姓名"]) +
+                "</td>" +
+                "<td>" +
+                esc(
+                  record[
+                    "可出勤到幾點"
+                  ]
+                ) +
+                "</td>" +
+                "<td>" +
+                esc(
+                  record[
+                    "填寫時間"
+                  ]
+                ) +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("");
+
+          return (
+            '<section class="card">' +
+            '<div class="head">' +
+            "<div>" +
+            '<div class="place">' +
+            esc(first["地點"]) +
+            "</div>" +
+            '<div class="date">' +
+            esc(first["日期"]) +
+            "</div>" +
+            "</div>" +
+            '<div class="count">' +
+            group.length +
+            " 人" +
+            "</div>" +
+            "</div>" +
+
+            "<table>" +
+            "<thead>" +
+            "<tr>" +
+            "<th>姓名</th>" +
+            "<th>可出勤到</th>" +
+            "<th>填寫時間</th>" +
+            "</tr>" +
+            "</thead>" +
+
+            "<tbody>" +
+            people +
+            "</tbody>" +
+            "</table>" +
+            "</section>"
+          );
+        })
+        .join("");
+    }
+
+    loadData();
+
+    setInterval(
+      loadData,
+      30000
+    );
+  </script>
+</body>
+</html>
