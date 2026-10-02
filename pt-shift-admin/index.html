@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>工讀排班｜管理者</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#f5f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--primary:#111827;--red:#dc2626;--green:#047857;--amber:#b45309}
+body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:var(--text)}
+main{max-width:1120px;margin:auto;padding:24px 16px 48px}
+h1{margin:0;font-size:32px}.sub{color:var(--muted);margin-top:6px}.topbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:18px 0}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer}.btn-light{background:#fff;border:1px solid #d1d5db}.btn-dark{background:var(--primary);color:white}.btn:disabled{opacity:.45;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(17,24,39,.05)}
+.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.title{font-size:24px;font-weight:900}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.pill{padding:7px 10px;border-radius:999px;background:#f3f4f6;font-size:13px}
+.summary{color:var(--muted);font-weight:700}.schools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}.school{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fafafa}.school-title{font-weight:900;font-size:18px;display:flex;justify-content:space-between;gap:8px}.ratio{font-size:13px;color:var(--muted);font-weight:700;margin-top:5px}
+.person{display:grid;grid-template-columns:minmax(90px,1.2fr) 54px 90px 90px;gap:8px;align-items:center;background:#fff;border:1px solid #eceff3;border-radius:12px;padding:10px 12px;margin-top:8px}.name{font-weight:800}.sex{font-weight:800}.until{color:var(--green);font-weight:900;text-align:right}.move{text-align:right;color:var(--muted);font-weight:800}.move.ok{color:var(--green)}.move.warn{color:var(--amber)}
+.standby{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}.standby-title{font-weight:900}
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}.note{font-size:13px;color:var(--muted);margin-top:10px}.empty{text-align:center;color:var(--muted);padding:24px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:14px}.legend b{color:var(--text)}
+@media(max-width:720px){main{padding:16px 12px 36px}.schools{grid-template-columns:1fr}.person{grid-template-columns:1fr 42px 72px}.move{grid-column:1/-1;text-align:left;font-size:12px}.title{font-size:21px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>工讀排班｜管理者</h1>
+  <div class="sub">分配預覽：男女平均優先、可搬運人員平均分散，其餘隨機</div>
+  <div class="topbar">
+    <div id="status" class="sub">同步中…</div>
+    <button class="btn btn-light" onclick="loadAll()">重新整理資料</button>
+  </div>
+  <div class="legend"><span><b>可搬運</b>：優先平均分散</span><span><b>注意</b>：只顯示提醒，不視為可搬運</span></div>
+  <div id="content"><div class="card empty">載入中…</div></div>
+</main>
+<script>
+const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
+let workers=[],tasks=[],signups=[],rerollNonce={};
+const clean=v=>String(v??"").trim();
+const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function maskName(name){const s=clean(name);if(!s)return"";if(s.length===1)return s;if(s.length===2)return s[0]+"○";return s[0]+"○".repeat(s.length-2)+s[s.length-1]}
+function normalizeTimeText(v){const m=clean(v).match(/(\d{1,2})\s*:\s*(\d{2})/);if(!m)return clean(v);return String(Number(m[1])).padStart(2,"0")+":"+m[2]}
+function timeMinutes(v){const m=clean(v).match(/(\d{1,2})\s*:\s*(\d{2})/);return m?Number(m[1])*60+Number(m[2]):0}
+function dateOrder(v){const m=clean(v).match(/^(\d{1,2})\/(\d{1,2})$/);return m?Number(m[1])*100+Number(m[2]):99999}
+function parseCsv(text){const rows=[];let row=[],cell="",q=false;for(let i=0;i<text.length;i++){const ch=text[i],n=text[i+1];if(ch==='"'){if(q&&n==='"'){cell+='"';i++}else q=!q}else if(ch===","&&!q){row.push(cell);cell=""}else if((ch==="\n"||ch==="\r")&&!q){if(ch==="\r"&&n==="\n")i++;row.push(cell);rows.push(row);row=[];cell=""}else cell+=ch}if(cell.length||row.length){row.push(cell);rows.push(row)}return rows}
+async function readSheet(sheet){const url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(sheet)+"&_="+Date.now();const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(sheet+"讀取失敗");const rows=parseCsv(await r.text());const h=(rows[0]||[]).map(clean);return rows.slice(1).map(row=>Object.fromEntries(h.map((k,i)=>[k,clean(row[i])])))}
+function active(s){return !clean(s["狀態"])||clean(s["狀態"])==="已報名"}
+function buildGroups(){
+  const map=new Map();
+  tasks.forEach(t=>{
+    const date=clean(t["日期"]),raw=clean(t["時間"]),key=date+"||"+normalizeTimeText(raw);
+    if(!map.has(key))map.set(key,{key,date,time:normalizeTimeText(raw),schools:[]});
+    map.get(key).schools.push({name:clean(t["地點"]),need:Number(clean(t["人數"]))||0});
+  });
+  return [...map.values()].sort((a,b)=>dateOrder(a.date)-dateOrder(b.date)||timeMinutes(a.time)-timeMinutes(b.time));
+}
+function workersByName(){const m=new Map();workers.forEach(w=>m.set(clean(w["姓名"]),w));return m}
+function peopleFor(group){
+  const wmap=workersByName(),latest=new Map(),schoolNames=new Set(group.schools.map(s=>s.name));
+  signups.forEach(s=>{
+    if(!active(s)||clean(s["日期"])!==group.date)return;
+    const shift=normalizeTimeText(s["班次時間"]);
+    const legacy=schoolNames.has(clean(s["地點"]))&&!shift;
+    if(!(shift===group.time||legacy))return;
+    const name=clean(s["姓名"]);if(!name)return;
+    latest.set(name,s);
+  });
+  return [...latest.values()].map(s=>{const w=wmap.get(clean(s["姓名"]))||{};return{name:clean(s["姓名"]),sex:clean(w["性別"])||"未填",move:clean(w["可搬運"])||"",until:clean(s["可出勤到幾點"])||"",raw:s}});
+}
+function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function seededRandom(seed){let x=seed>>>0;return()=>{x+=0x6D2B79F5;let t=x;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+function shuffle(arr,seed){const a=arr.slice(),r=seededRandom(hashString(seed));for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function allocate(group,people){
+  const totalNeed=group.schools.reduce((s,x)=>s+x.need,0);
+  if(!totalNeed)return null;
+  const nonce=rerollNonce[group.key]||0;
+  const seed=group.key+"|"+nonce+"|"+people.map(p=>p.name+":"+p.until).sort().join("|");
+  let men=shuffle(people.filter(p=>p.sex==="男"),seed+"|m");
+  let women=shuffle(people.filter(p=>p.sex==="女"),seed+"|f");
+  let other=shuffle(people.filter(p=>p.sex!=="男"&&p.sex!=="女"),seed+"|o");
+
+  // Prefer people who can搬運 to be spread across schools.
+  const moverFirst=list=>list.slice().sort((a,b)=>(b.move==="可")-(a.move==="可"));
+  men=moverFirst(men); women=moverFirst(women); other=moverFirst(other);
+
+  const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]}));
+  const take=(list)=>list.shift();
+
+  // Fill each school aiming for balanced genders.
+  for(const box of assigned){
+    while(box.people.length<box.need){
+      const mc=box.people.filter(p=>p.sex==="男").length;
+      const fc=box.people.filter(p=>p.sex==="女").length;
+      let p=null;
+      if(mc<fc && men.length)p=take(men);
+      else if(fc<mc && women.length)p=take(women);
+      else{
+        if(men.length&&women.length){
+          p=(men.length>=women.length)?take(men):take(women);
+        }else if(men.length)p=take(men);
+        else if(women.length)p=take(women);
+        else if(other.length)p=take(other);
+      }
+      if(!p)break;
+      box.people.push(p);
+    }
+  }
+
+  // Improvement pass: if a school has no mover but another has >1, swap same-sex when possible.
+  const movers=box=>box.people.filter(p=>p.move==="可").length;
+  for(const target of assigned){
+    if(movers(target)>0)continue;
+    const donor=assigned.find(b=>movers(b)>1);
+    if(!donor)continue;
+    let done=false;
+    for(let i=0;i<target.people.length&&!done;i++){
+      const t=target.people[i];
+      const j=donor.people.findIndex(p=>p.move==="可"&&p.sex===t.sex);
+      if(j>=0){const d=donor.people[j];donor.people[j]=t;target.people[i]=d;done=true}
+    }
+  }
+
+  const standby=[...men,...women,...other];
+  return {assigned,standby,totalNeed};
+}
+function personHtml(p){
+  const moveClass=p.move==="可"?"ok":p.move==="注意"?"warn":"";
+  return '<div class="person"><div class="name">'+esc(maskName(p.name))+'</div><div class="sex">'+esc(p.sex)+'</div><div class="until">'+esc(p.until||"-")+'</div><div class="move '+moveClass+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div>';
+}
+function render(){
+  const root=document.getElementById("content"),groups=buildGroups();
+  root.innerHTML=groups.map(g=>{
+    const people=peopleFor(g),result=allocate(g,people);
+    if(!result)return '<section class="card"><div class="head"><div><div class="title">'+esc(g.date+' '+g.time)+'</div></div></div><div class="empty">此班次尚未設定各校需求人數，暫不產生分配預覽。</div></section>';
+    const schools=result.assigned.map(b=>{
+      const m=b.people.filter(p=>p.sex==="男").length,f=b.people.filter(p=>p.sex==="女").length,mv=b.people.filter(p=>p.move==="可").length;
+      return '<div class="school"><div class="school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div>'+
+        '<div class="ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+
+        (b.people.length?b.people.map(personHtml).join(""):'<div class="empty">尚無人員</div>')+
+        '</div>';
+    }).join("");
+    const standby=result.standby.length?'<div class="standby"><div class="standby-title">候補 '+result.standby.length+' 人</div>'+result.standby.map(personHtml).join("")+'</div>':'';
+    const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
+    return '<section class="card"><div class="head"><div><div class="title">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="meta"><span class="pill">報名 '+people.length+' 人</span><span class="pill">需求 '+result.totalNeed+' 人</span><span class="pill">男 '+totalM+' / 女 '+totalF+'</span></div></div><div class="summary">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+
+      '<div class="schools">'+schools+'</div>'+standby+
+      '<div class="actions"><button class="btn btn-light" onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button class="btn btn-dark" disabled>確認分配（測試版）</button></div>'+
+      '<div class="note">目前只做預覽，不會寫回 Google Sheet。你確認分配方式沒問題後，再開啟正式「確認分配」。</div></section>';
+  }).join("");
+}
+function reroll(key){rerollNonce[key]=(rerollNonce[key]||0)+1;render()}
+async function loadAll(){
+  document.getElementById("status").textContent="同步中…";
+  try{
+    [workers,tasks,signups]=await Promise.all([readSheet("工讀生名單"),readSheet("工作任務"),readSheet("報名紀錄")]);
+    render();
+    document.getElementById("status").textContent="已同步 · "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+  }catch(e){document.getElementById("status").textContent="同步失敗";document.getElementById("content").innerHTML='<div class="card empty">'+esc(e.message||"讀取失敗")+'</div>'}
+}
+loadAll();
+</script>
+</body>
+</html>
