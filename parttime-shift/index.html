@@ -89,7 +89,7 @@ function groupTasks(rows){
     const time=normalizeTimeText(t["時間"]);
     if(school) g.schools.push({school,time});
     const n=Number(clean(t["人數"]));
-    if(n && (!g.headcount || n>Number(g.headcount))) g.headcount=String(n);
+    if(n) g.headcount=String((Number(g.headcount)||0)+n);
     if(time && (!g.shiftTime || time<g.shiftTime)) g.shiftTime=time;
   });
   return Array.from(map.values());
