@@ -17,7 +17,7 @@ button.refresh{border:1px solid #d1d5db;background:#fff;border-radius:10px;paddi
 hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
 label{display:block;font-weight:700;margin:12px 0 7px}
 select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;background:#fff;color:#111827;padding:0 14px;font-size:16px}
-.time-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}.colon{font-size:22px;font-weight:800;color:#6b7280}
+
 .btn{width:100%;margin-top:14px;border:0;border-radius:14px;background:#111827;color:white;padding:14px 16px;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55}
 .person{display:flex;justify-content:space-between;align-items:center;background:#fafafa;border:1px solid #eceff3;border-radius:12px;padding:10px 12px;margin-top:7px}.ptime{font-weight:800;color:#0f766e}
 .notice{display:none;margin:0 0 14px;padding:12px 14px;border-radius:14px}.notice.ok{display:block;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}.notice.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
@@ -111,7 +111,6 @@ function render(){
     const people=signups.filter(function(s){return k(s)===k(t)});
     const opts='<option value="">請選擇姓名</option>'+workers.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join("");
     const peopleHtml=people.length?people.map(function(p){return '<div class="person"><strong>'+esc(p["姓名"])+'</strong><span class="ptime">'+esc(p["可出勤到幾點"])+'</span></div>'}).join(""):'<div class="empty">目前尚無人登記</div>';
-    const hours=Array.from({length:24},function(_,h){const v=String(h).padStart(2,"0");return '<option value="'+v+'">'+v+'</option>'}).join("");
     return '<section class="card">'+
       '<div class="head"><div><div class="place">'+esc(t["地點"])+'</div><div class="meta">'+
       '<span class="pill">'+esc(t["日期"])+'</span>'+
@@ -119,9 +118,15 @@ function render(){
       (t["人數"]?'<span class="pill">需求 '+esc(t["人數"])+' 人</span>':'')+
       '</div></div><div class="count">已登記 '+people.length+(t["人數"]?'/'+esc(t["人數"]):'')+'</div></div>'+
       '<hr><label>姓名</label><select id="name_'+i+'">'+opts+'</select>'+
-      '<label>可出勤到幾點</label><div class="time-grid">'+
-      '<select id="hour_'+i+'"><option value="">小時</option>'+hours+'</select><div class="colon">:</div>'+
-      '<select id="minute_'+i+'"><option value="">分鐘</option><option>00</option><option>15</option><option>30</option><option>45</option></select></div>'+
+      '<label>可出勤到幾點</label>'+
+      '<select id="until_'+i+'"><option value="">請選擇時間</option>'+
+      Array.from({length:48},function(_,n){
+        const h=Math.floor(n/2);
+        const m=n%2===0?"00":"30";
+        const v=String(h).padStart(2,"0")+":"+m;
+        return '<option value="'+v+'">'+v+'</option>';
+      }).join("")+
+      '</select>'+
       '<button class="btn" id="btn_'+i+'" onclick="submitSignup('+i+')">確認可以上班</button>'+
       '<hr><strong>目前可出勤人員</strong>'+peopleHtml+
       '</section>';
@@ -130,11 +135,9 @@ function render(){
 async function submitSignup(i){
   const t=tasks[i];
   const name=clean(document.getElementById("name_"+i).value);
-  const hour=clean(document.getElementById("hour_"+i).value);
-  const minute=clean(document.getElementById("minute_"+i).value);
+  const until=clean(document.getElementById("until_"+i).value);
   if(!name)return show("請先選擇姓名","err");
-  if(!hour||!minute)return show("請選擇可出勤時間","err");
-  const until=hour+":"+minute;
+  if(!until)return show("請選擇可出勤時間","err");
   const btn=document.getElementById("btn_"+i);btn.disabled=true;btn.textContent="送出中…";
   try{
     await fetch(API,{
