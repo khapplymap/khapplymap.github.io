@@ -18,7 +18,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
 label{display:block;font-weight:700;margin:12px 0 7px}
 select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;background:#fff;color:#111827;padding:0 14px;font-size:16px}
 
-.btn{width:100%;margin-top:14px;border:0;border-radius:14px;background:#111827;color:white;padding:14px 16px;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55}
+.btn{width:100%;margin-top:14px;border:0;border-radius:14px;background:#111827;color:white;padding:14px 16px;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55}.cancel-btn{display:none;width:100%;margin-top:9px;border:1px solid #fecaca;border-radius:14px;background:#fff;color:#b91c1c;padding:12px 16px;font-size:15px;font-weight:800;cursor:pointer}
 .person{display:flex;justify-content:space-between;align-items:center;background:#fafafa;border:1px solid #eceff3;border-radius:12px;padding:10px 12px;margin-top:7px}.ptime{font-weight:800;color:#0f766e}
 .notice{display:none;margin:0 0 14px;padding:12px 14px;border-radius:14px}.notice.ok{display:block;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}.notice.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
 .empty{text-align:center;color:#6b7280;padding:12px}.hint{font-size:13px;color:#6b7280;margin-top:7px}.hint.active{color:#0f766e;font-weight:700}
@@ -128,6 +128,15 @@ async function loadAll(){
   }
 }
 function k(o){return clean(o["日期"])+"||"+clean(o["地點"])}
+function isActiveSignup(s){
+  const status=clean(s["狀態"]);
+  return !status||status==="已報名";
+}
+function isTaskToday(t){
+  const d=taskDate(t["日期"]);
+  const today=taipeiToday();
+  return !!d && d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && d.getDate()===today.getDate();
+}
 function render(){
   const root=document.getElementById("content");
   if(!tasks.length){root.innerHTML='<div class="card empty">目前沒有工作任務</div>';return}
@@ -153,6 +162,7 @@ function render(){
       }).join("")+
       '</select>'+
       '<button class="btn" id="btn_'+i+'" onclick="submitSignup('+i+')">確認可以上班</button>'+
+      '<button class="cancel-btn" id="cancel_'+i+'" onclick="cancelSignup('+i+')">取消出勤</button>'+
       
       '</section>';
   }).join("");
@@ -162,6 +172,9 @@ function syncExisting(i){
   const name=clean(document.getElementById("name_"+i).value);
   const untilEl=document.getElementById("until_"+i);
   const hint=document.getElementById("hint_"+i);
+  const cancelBtn=document.getElementById("cancel_"+i);
+
+  cancelBtn.style.display="none";
 
   if(!name){
     untilEl.value="";
@@ -174,10 +187,20 @@ function syncExisting(i){
     return k(s)===k(t)&&clean(s["姓名"])===name;
   });
 
-  if(found){
+  if(found && isActiveSignup(found)){
     untilEl.value=clean(found["可出勤到幾點"]);
-    hint.textContent="你已經登記過，可重新選擇時間後再次送出更新";
-    hint.className="hint active";
+    if(isTaskToday(t)){
+      hint.textContent="你已登記；今天如需取消，請聯絡正職人員";
+      hint.className="hint active";
+    }else{
+      hint.textContent="你已登記，可修改時間或取消出勤";
+      hint.className="hint active";
+      cancelBtn.style.display="block";
+    }
+  }else if(found){
+    untilEl.value="";
+    hint.textContent="你之前已取消，可重新選擇時間後再次報名";
+    hint.className="hint";
   }else{
     untilEl.value="";
     hint.textContent="尚未登記";
@@ -210,6 +233,39 @@ async function submitSignup(i){
     btn.disabled=false;btn.textContent="確認可以上班";
   }
 }
+async function cancelSignup(i){
+  const t=tasks[i];
+  const name=clean(document.getElementById("name_"+i).value);
+  if(!name)return show("請先選擇姓名","err");
+  if(isTaskToday(t))return show("工作當天無法自行取消，請聯絡正職人員","err");
+  if(!confirm("確定要取消 "+clean(t["日期"])+" "+clean(t["地點"])+" 的出勤嗎？"))return;
+
+  const btn=document.getElementById("cancel_"+i);
+  btn.disabled=true;
+  btn.textContent="取消中…";
+
+  try{
+    await fetch(API,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({
+        action:"cancel",
+        date:clean(t["日期"]),
+        place:clean(t["地點"]),
+        name:name
+      })
+    });
+    show("已取消出勤","ok");
+    setTimeout(loadAll,1200);
+  }catch(e){
+    show("取消失敗，請再試一次","err");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="取消出勤";
+  }
+}
+
 loadAll();
 setInterval(loadAll,30000);
 </script>
