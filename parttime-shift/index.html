@@ -248,9 +248,6 @@ function render(){
       '<label>可出勤到幾點</label>'+
       '<select id="until_'+i+'">'+timeOptions(g.shiftTime)+'</select>'+
       '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
-      '<hr>'+
-      '<strong>目前可出勤人員</strong>'+
-      peopleHtml+
       '</section>';
   }).join("");
 }
