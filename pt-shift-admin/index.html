@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>工讀排班｜管理者 v2</title>
+<title>工讀排班｜管理者</title>
 <style>
 *{box-sizing:border-box}
 :root{--bg:#f5f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--primary:#111827;--red:#dc2626;--green:#047857;--amber:#b45309}
@@ -26,8 +26,8 @@ h1{margin:0;font-size:32px}.sub{color:var(--muted);margin-top:6px}.topbar{displa
 </head>
 <body>
 <main>
-  <h1>工讀排班｜管理者</h1><div style="display:inline-block;margin-top:10px;padding:7px 10px;border-radius:999px;background:#111827;color:#fff;font-size:12px;font-weight:900">管理者測試版 2308</div>
-  <div class="sub">分配預覽：男女平均優先、可搬運人員平均分散，其餘隨機</div><div style="font-size:12px;color:#9ca3af;margin-top:4px">測試版 v2｜可直接點人員下方按鈕手動調配</div>
+  <h1>工讀排班｜管理者</h1>
+  <div class="sub">排程分配：男女平均優先、可搬運人員平均分散，可再手動調整</div>
   <div class="topbar">
     <div id="status" class="sub">同步中…</div>
     <button class="btn btn-light" onclick="loadAll()">重新整理資料</button>
@@ -197,8 +197,8 @@ function render(){
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
     return '<section class="card"><div class="head"><div><div class="title">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="meta"><span class="pill">報名 '+people.length+' 人</span><span class="pill">需求 '+result.totalNeed+' 人</span><span class="pill">男 '+totalM+' / 女 '+totalF+'</span></div></div><div class="summary">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+
       '<div class="schools">'+schools+'</div>'+standby+
-      '<div class="actions"><button class="btn btn-light" onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button class="btn btn-light" onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button class="btn btn-dark" disabled>確認分配（測試版）</button></div>'+
-      '<div class="note">目前可手動調配任一人員到指定學校或候補；這些變更仍只停留在預覽，不會寫回 Google Sheet。</div></section>';
+      '<div class="actions"><button class="btn btn-light" onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button class="btn btn-light" onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button class="btn btn-dark" disabled title="Google Sheet 寫回尚未啟用">確認分配</button></div>'+
+      '<div class="note">可手動調配任一人員到指定學校或候補。</div></section>';
   }).join("");
 }
 function reroll(key){rerollNonce[key]=(rerollNonce[key]||0)+1;manualOverrides[key]={};render()}
