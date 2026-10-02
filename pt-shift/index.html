@@ -217,10 +217,10 @@ function afternoonSignupState(group){
   const now=taipeiNowParts();
   const today=now.year+"-"+now.month+"-"+now.day;
 
-  if(iso!==today) return {open:false,reason:"當天 11:30 開放報名"};
+  if(iso!==today) return {open:false,reason:"當天 11:30 開放登記"};
 
   const mins=Number(now.hour)*60+Number(now.minute);
-  if(mins<11*60+30) return {open:false,reason:"當天 11:30 開放報名"};
+  if(mins<11*60+30) return {open:false,reason:"當天 11:30 開放登記"};
 
   return {open:true,reason:""};
 }
