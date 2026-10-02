@@ -189,6 +189,24 @@ async function loadAll(){
   }
 }
 
+function timeOptions(startTime){
+  const m=clean(startTime).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  let startMinutes=9*60;
+  if(m){
+    startMinutes=Number(m[1])*60+Number(m[2]);
+    startMinutes=Math.ceil(startMinutes/30)*30;
+  }
+  const endMinutes=18*60;
+  let html='<option value="">請選擇時間</option>';
+  for(let mins=startMinutes; mins<=endMinutes; mins+=30){
+    const h=String(Math.floor(mins/60)).padStart(2,"0");
+    const mm=String(mins%60).padStart(2,"0");
+    const v=h+":"+mm;
+    html+='<option value="'+v+'">'+v+'</option>';
+  }
+  return html;
+}
+
 function render(){
   const root=document.getElementById("content");
   const groups=groupTasks(tasks);
@@ -228,7 +246,7 @@ function render(){
       '<label>姓名</label>'+
       '<select id="name_'+i+'">'+opts+'</select>'+
       '<label>可出勤到幾點</label>'+
-      '<input id="until_'+i+'" type="time" step="900">'+
+      '<select id="until_'+i+'">'+timeOptions(g.shiftTime)+'</select>'+
       '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
       '<hr>'+
       '<strong>目前可出勤人員</strong>'+
