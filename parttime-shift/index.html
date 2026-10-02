@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2211";
+const BUILD_VERSION="20261002-2216";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -106,18 +106,25 @@ function groupTasks(rows){
   const map=new Map();
   rows.forEach(t=>{
     const date=clean(t["日期"]);
-    const period=periodKey(t["時間"]);
-    const k=date+"||"+period;
+    const rawTime=clean(t["時間"]);
+    const displayTime=normalizeTimeText(rawTime);
+    const mode=clean(t["開放時間"]) ? "下午" : "一般";
+    const k=date+"||"+rawTime+"||"+mode;
     if(!map.has(k)){
-      map.set(k,{date,period,schools:[],headcount:"",shiftTime:""});
+      map.set(k,{
+        date,
+        rawTime,
+        displayTime,
+        mode,
+        schools:[],
+        headcount:""
+      });
     }
     const g=map.get(k);
     const school=clean(t["地點"]);
-    const time=normalizeTimeText(t["時間"]);
-    if(school) g.schools.push({school,time});
+    if(school) g.schools.push({school,time:displayTime});
     const n=Number(clean(t["人數"]));
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
-    if(time && (!g.shiftTime || time<g.shiftTime)) g.shiftTime=time;
   });
   return Array.from(map.values());
 }
@@ -129,8 +136,10 @@ function groupPeople(group){
     if(!activeSignup(s)) return;
     if(clean(s["日期"])!==group.date) return;
 
-    const signupShift=normalizeTimeText(s["班次時間"]);
-    const sameShift=signupShift ? periodKey(signupShift)===group.period : false;
+    const signupShift=clean(s["班次時間"]);
+    const sameShift=signupShift
+      ? normalizeTimeText(signupShift)===group.displayTime
+      : false;
     const place=clean(s["地點"]);
     const legacyMatch=schoolNames.has(place);
     const pendingMatch=place==="待分派" && (!signupShift || sameShift);
@@ -273,7 +282,7 @@ function render(){
       '<label>姓名</label>'+
       '<select id="name_'+i+'">'+opts+'</select>'+
       '<label>可出勤到幾點</label>'+
-      '<select id="until_'+i+'">'+timeOptions(g.shiftTime)+'</select>'+
+      '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
       '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
       '</section>';
   }).join("");
@@ -309,8 +318,9 @@ async function submitSignup(i){
         date:group.date,
         place:"待分派",
         location:"待分派",
-        shiftTime:group.shiftTime,
-        time:group.shiftTime,
+        shiftTime:group.rawTime,
+        time:group.rawTime,
+        mode:group.mode || "一般",
         name:name,
         until:until
       })
