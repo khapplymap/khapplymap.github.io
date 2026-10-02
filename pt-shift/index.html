@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 <div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 2322</div></main>
 <script>
-const BUILD_VERSION="20261002-2328";
+const BUILD_VERSION="20261002-2335";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -144,9 +144,9 @@ function groupTasks(rows){
 
     const g=map.get(k);
     const school=clean(t["地點"]);
-    if(school) g.schools.push({school,time:displayTime});
-
     const n=Number(clean(t["人數"]));
+    if(school) g.schools.push({school,time:displayTime,headcount:n||0});
+
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
   });
   function dateOrderValue(dateText){
@@ -309,6 +309,95 @@ function timeOptions(startTime){
   return html;
 }
 
+function hashString(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return h>>>0;
+}
+
+function seededRandom(seed){
+  let x=seed>>>0;
+  return function(){
+    x+=0x6D2B79F5;
+    let t=x;
+    t=Math.imul(t^(t>>>15),t|1);
+    t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;
+  };
+}
+
+function shuffledStable(items,seedText){
+  const out=items.slice();
+  const rand=seededRandom(hashString(seedText));
+  for(let i=out.length-1;i>0;i--){
+    const j=Math.floor(rand()*(i+1));
+    [out[i],out[j]]=[out[j],out[i]];
+  }
+  return out;
+}
+
+function buildAssignment(group,people){
+  const schools=group.schools.filter(s=>Number(s.headcount)>0);
+  if(schools.length<2) return null;
+
+  const uniquePeople=[];
+  const seen=new Set();
+  people.forEach(p=>{
+    const n=clean(p["姓名"]);
+    if(n && !seen.has(n)){
+      seen.add(n);
+      uniquePeople.push(p);
+    }
+  });
+
+  const seed=group.date+"|"+group.rawTime+"|"+
+    schools.map(s=>s.school+":"+s.headcount).join("|")+"|"+
+    uniquePeople.map(p=>clean(p["姓名"])+":"+clean(p["可出勤到幾點"])).sort().join("|");
+
+  const pool=shuffledStable(uniquePeople,seed);
+  let idx=0;
+  const assigned=schools.map(s=>{
+    const arr=[];
+    const need=Number(s.headcount)||0;
+    for(let k=0;k<need && idx<pool.length;k++,idx++) arr.push(pool[idx]);
+    return {school:s.school,need,people:arr};
+  });
+  const standby=pool.slice(idx);
+  return {assigned,standby};
+}
+
+function assignmentHtml(group,people){
+  const result=buildAssignment(group,people);
+  if(!result) return "";
+
+  const blocks=result.assigned.map(a=>{
+    const list=a.people.length
+      ? a.people.map(p=>
+          '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
+        ).join("")
+      : '<div class="empty">尚無人員</div>';
+    return '<div style="margin-top:14px">'+
+      '<div style="font-weight:900;font-size:17px;margin-bottom:6px">'+esc(a.school)+'｜'+a.people.length+'/'+a.need+' 人</div>'+
+      list+
+      '</div>';
+  }).join("");
+
+  const standby=result.standby.length
+    ? '<div style="margin-top:16px"><div style="font-weight:900;font-size:17px;margin-bottom:6px">候補</div>'+
+      result.standby.map(p=>
+        '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
+      ).join("")+
+      '</div>'
+    : "";
+
+  return '<hr><div style="font-weight:900;font-size:19px;margin-bottom:4px">隨機指派結果</div>'+
+    '<div style="color:#6b7280;font-size:13px;margin-bottom:6px">依目前報名名單自動產生</div>'+
+    blocks+standby;
+}
+
 function render(){
   const root=document.getElementById("content");
   const groups=groupTasks(tasks);
@@ -355,12 +444,14 @@ function render(){
             '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
             '<hr>'+
             '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
-            '<div class="people">'+peopleHtml+'</div>';
+            '<div class="people">'+peopleHtml+'</div>'+
+            assignmentHtml(g,people);
         }
         return '<hr>'+
           '<div class="notice" style="display:block;background:#f9fafb;color:#6b7280">'+esc(state.reason)+'</div>'+
           '<div style="font-weight:800;margin:14px 0 6px">目前可出勤人員</div>'+
-          '<div class="people">'+peopleHtml+'</div>';
+          '<div class="people">'+peopleHtml+'</div>'+
+          assignmentHtml(g,people);
       })()+
       '</section>';
       '</section>';
