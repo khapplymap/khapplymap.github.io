@@ -2,233 +2,352 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>工讀排班</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:#111827}
-main{max-width:760px;margin:0 auto;padding:20px 14px 40px}
-h1{margin:0;font-size:30px;font-weight:800}.sub{margin-top:6px;color:#6b7280}
-.toolbar{display:flex;justify-content:space-between;align-items:center;margin:18px 0 12px;color:#6b7280;font-size:14px}
+body{margin:0;background:#f5f6f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:#111827}
+main{max-width:760px;margin:auto;padding:22px 14px 44px}
+h1{font-size:30px;margin:4px 0 2px}.sub{color:#6b7280;margin-bottom:16px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin:8px 0 14px;color:#6b7280;font-size:14px}
 .refresh{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 10px 30px rgba(17,24,39,.06)}
-.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.title{font-size:22px;font-weight:800}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 8px 28px rgba(0,0,0,.05)}
+.head{display:flex;justify-content:space-between;gap:12px}.place{font-size:22px;font-weight:800}.school-block{margin-top:14px}.school-label{font-size:18px;font-weight:900;color:#dc2626;margin-bottom:8px}.school-item{font-size:18px;font-weight:800;color:#dc2626;line-height:1.65}.school-list{display:flex;flex-direction:column;gap:3px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.pill{background:#f3f4f6;padding:7px 10px;border-radius:999px;font-size:13px}
-.school-list{margin-top:10px;color:#374151;font-size:14px;line-height:1.7}
+.count{font-size:14px;color:#6b7280;white-space:nowrap}
 label{display:block;font-weight:700;margin:13px 0 7px}
-select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;padding:0 14px;font-size:16px;background:#fff;color:#111827}
-.btn{width:100%;margin-top:14px;height:50px;border:0;border-radius:14px;background:#111827;color:#fff;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55;cursor:not-allowed}
-.cancel{display:none;width:100%;margin-top:9px;height:46px;border:1px solid #fecaca;border-radius:14px;background:#fff;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer}
-.notice{display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px}.notice.error{display:block;border:1px solid #fecaca;background:#fef2f2;color:#991b1b}.notice.ok{display:block;border:1px solid #a7f3d0;background:#ecfdf5;color:#065f46}
-.info{margin-top:10px;padding:11px 12px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-weight:700;font-size:14px}
-.locked{margin-top:10px;padding:11px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;font-size:14px}
-.hint{font-size:13px;color:#6b7280;margin-top:7px}.hint.active{color:#0f766e;font-weight:700}
-hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}.empty{text-align:center;color:#6b7280;padding:18px}
-@media(max-width:560px){main{padding:14px 12px 36px}h1{font-size:27px}.card{padding:16px}.title{font-size:20px}}
+select,input{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;padding:0 14px;font-size:16px;background:#fff;color:#111827}.time-row{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}.time-sep{font-size:22px;font-weight:800;color:#6b7280;text-align:center}
+select{appearance:auto;-webkit-appearance:menulist}
+.btn{width:100%;margin-top:14px;height:50px;border:0;border-radius:14px;background:#111827;color:#fff;font-size:16px;font-weight:800;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:wait}
+.person{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #eceff3;border-radius:12px;background:#fafafa;margin-top:7px}
+.time{font-weight:800;color:#0f766e}.empty{color:#6b7280;text-align:center;padding:12px}
+.notice{display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;border:1px solid #d1d5db;background:#fff}
+.notice.error{display:block;border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.notice.ok{display:block;border-color:#a7f3d0;background:#ecfdf5;color:#065f46}
+hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
+@media(max-width:560px){main{padding:14px 12px 36px}h1{font-size:27px}.card{border-radius:18px;padding:16px}.place{font-size:20px}}
 </style>
 </head>
 <body>
 <main>
-<h1>工讀排班</h1>
-<div class="sub">登記可出勤時間；多校班次由系統分派</div>
-<div id="notice" class="notice"></div>
-<div class="toolbar"><span id="status">同步中…</span><button class="refresh" onclick="loadAll()">重新整理</button></div>
-<div id="content"><div class="card empty">載入資料中…</div></div>
+  <h1>工讀排班</h1>
+  <div class="sub">選擇工作任務，登記你可以出勤到幾點</div>
+  <div id="notice" class="notice"></div>
+  <div class="toolbar">
+    <span id="status">同步中…</span>
+    <button class="refresh" onclick="loadAll()">重新整理</button>
+  </div>
+  <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
+const BUILD_VERSION="20261002-2228";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let workers=[],tasks=[],signups=[],holidays=new Set(),groups=[];
+const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
+let workers=[],tasks=[],signups=[];
+const clean=v=>String(v??"").trim();
+const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function maskName(name){
+  const s=clean(name);
+  if(!s) return "";
+  if(s.length===1) return s;
+  if(s.length===2) return s[0]+"○";
+  return s[0]+"○".repeat(s.length-2)+s[s.length-1];
+}
 
-function clean(v){return String(v==null?"":v).trim()}
-function esc(v){return clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
-function show(msg,type="ok"){const n=document.getElementById("notice");n.textContent=msg;n.className="notice "+type;clearTimeout(window.__notice);window.__notice=setTimeout(()=>n.className="notice",3000)}
+async function ensureLatestVersion(){
+  try{
+    if("serviceWorker" in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs) await reg.unregister();
+    }
+    if("caches" in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+
+    const r=await fetch("./version.json?_="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const info=await r.json();
+    const latest=clean(info.version);
+    if(latest && latest!==BUILD_VERSION){
+      const u=new URL(location.href);
+      u.searchParams.set("v",latest);
+      location.replace(u.toString());
+    }
+  }catch(e){}
+}
+
+function show(msg,type="ok"){
+  const n=document.getElementById("notice");
+  n.textContent=msg;
+  n.className="notice "+type;
+  clearTimeout(window.__noticeTimer);
+  window.__noticeTimer=setTimeout(()=>{n.className="notice";n.style.display="none"},2600);
+}
+
+function activeSignup(s){
+  const status=clean(s["狀態"]);
+  return !status || status==="已報名";
+}
+
+function periodKey(timeText){
+  const m=clean(timeText).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return "all";
+  const h=Number(m[1]);
+  if(h<12) return "am";
+  if(h<18) return "pm";
+  return "eve";
+}
+
+function normalizeTimeText(v){
+  const m=clean(v).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return clean(v);
+  return String(Number(m[1])).padStart(2,"0")+":"+m[2];
+}
+
+function groupTasks(rows){
+  const map=new Map();
+  rows.forEach(t=>{
+    const date=clean(t["日期"]);
+    const rawTime=clean(t["時間"]);
+    const displayTime=normalizeTimeText(rawTime);
+    const mode=clean(t["開放時間"]) ? "下午" : "一般";
+    const k=date+"||"+rawTime+"||"+mode;
+    if(!map.has(k)){
+      map.set(k,{
+        date,
+        rawTime,
+        displayTime,
+        mode,
+        schools:[],
+        headcount:""
+      });
+    }
+    const g=map.get(k);
+    const school=clean(t["地點"]);
+    if(school) g.schools.push({school,time:displayTime});
+    const n=Number(clean(t["人數"]));
+    if(n) g.headcount=String((Number(g.headcount)||0)+n);
+  });
+  return Array.from(map.values());
+}
+
+function groupPeople(group){
+  const schoolNames=new Set(group.schools.map(x=>x.school));
+  const byName=new Map();
+  signups.forEach(s=>{
+    if(!activeSignup(s)) return;
+    if(clean(s["日期"])!==group.date) return;
+
+    const signupShift=clean(s["班次時間"]);
+    const sameShift=signupShift
+      ? normalizeTimeText(signupShift)===group.displayTime
+      : false;
+    const place=clean(s["地點"]);
+    const legacyMatch=schoolNames.has(place);
+    const pendingMatch=place==="待分派" && (!signupShift || sameShift);
+
+    if(!(sameShift || legacyMatch || pendingMatch)) return;
+
+    const name=clean(s["姓名"]);
+    if(!name) return;
+    byName.set(name,s);
+  });
+  return Array.from(byName.values());
+}
+
+function scheduleTitle(dateText){
+  const d=clean(dateText);
+  if(d==="10/10") return "10/10（五）排班";
+  return d ? d+" 排班" : "排班";
+}
 
 function parseCsv(text){
-  const out=[];let row=[],cell="",q=false;
-  for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];
-    if(ch==='"'){if(q&&next==='"'){cell+='"';i++}else q=!q}
-    else if(ch===","&&!q){row.push(cell);cell=""}
-    else if((ch==="\n"||ch==="\r")&&!q){if(ch==="\r"&&next==="\n")i++;row.push(cell);out.push(row);row=[];cell=""}
-    else cell+=ch;
+  const rows=[];
+  let row=[],cell="",quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i],next=text[i+1];
+    if(ch==='"'){
+      if(quoted&&next==='"'){cell+='"';i++;}
+      else quoted=!quoted;
+    }else if(ch===","&&!quoted){
+      row.push(cell);cell="";
+    }else if((ch==="\n"||ch==="\r")&&!quoted){
+      if(ch==="\r"&&next==="\n")i++;
+      row.push(cell);rows.push(row);row=[];cell="";
+    }else{
+      cell+=ch;
+    }
   }
-  if(cell.length||row.length){row.push(cell);out.push(row)}return out;
+  if(cell.length||row.length){row.push(cell);rows.push(row);}
+  return rows;
 }
-async function csvSheet(name){
-  const u="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(name)+"&_="+Date.now();
-  const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw Error("無法讀取 "+name);return parseCsv(await r.text());
-}
-function rowsToObjects(rows){const h=(rows[0]||[]).map(clean);return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=clean(r[i]));return o})}
 
-function todayParts(){
-  const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
-  const get=t=>Number(p.find(x=>x.type===t).value);return {y:get("year"),m:get("month"),d:get("day"),h:get("hour"),min:get("minute")};
-}
-function taskDate(raw){
-  const s=clean(raw);let m=s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-  if(m)return new Date(+m[1],+m[2]-1,+m[3]);
-  m=s.match(/^(\d{1,2})[\/-](\d{1,2})$/);if(!m)return null;
-  return new Date(todayParts().y,+m[1]-1,+m[2]);
-}
-function dateKey(d){return d?d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getDate()).padStart(2,"0"):""}
-function isFutureOrToday(raw){const d=taskDate(raw);if(!d)return true;const n=todayParts();const t=new Date(n.y,n.m-1,n.d);return d>=t}
-function isHoliday(raw){const d=taskDate(raw);if(!d)return false;return d.getDay()===0||d.getDay()===6||holidays.has(dateKey(d))}
-function modeOf(t){return clean(t["開放時間"])?"下午":"一般"}
-function groupKey(t){return clean(t["日期"])+"||"+clean(t["時間"])+"||"+modeOf(t)}
-function generalPublished(dateRaw){
-  const d=taskDate(dateRaw);if(!d)return false;const n=todayParts();
-  const now=new Date(n.y,n.m-1,n.d,n.h,n.min);
-  const pub=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1,18,30);
-  return now>=pub;
-}
-function afternoonOpen(g){
-  if(g.mode!=="下午")return true;
-  if(isHoliday(g.date))return false;
-  const d=taskDate(g.date);if(!d)return false;
-  const n=todayParts();const now=new Date(n.y,n.m-1,n.d,n.h,n.min);
-  const open=(g.tasks.map(t=>clean(t["開放時間"])).filter(Boolean).sort()[0]||"11:30").split(":");
-  return now>=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Number(open[0])||0,Number(open[1])||0);
-}
-function activeSignup(s){const v=clean(s["狀態"]);return !v||v==="已報名"}
-function findSignup(g,name){
-  return signups.find(s=>clean(s["日期"])===g.date&&clean(s["班次時間"])===g.time&&clean(s["排程類型"])===g.mode&&clean(s["姓名"])===name);
-}
-function buildGroups(){
-  const m={};
-  tasks.filter(t=>clean(t["日期"])&&clean(t["地點"])&&isFutureOrToday(t["日期"])).forEach(t=>{
-    const k=groupKey(t);if(!m[k])m[k]={date:clean(t["日期"]),time:clean(t["時間"]),mode:modeOf(t),tasks:[]};m[k].tasks.push(t);
-  });
-  groups=Object.values(m).sort((a,b)=>{const da=taskDate(a.date),db=taskDate(b.date);return (da-db)||a.time.localeCompare(b.time)||a.mode.localeCompare(b.mode)});
-}
-async function autoPublish(){
-  try{await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"autoPublish"})})}catch(e){}
+async function readSheet(sheetName){
+  const url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+
+    "/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(sheetName)+"&_="+Date.now();
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const r=await fetch(url,{cache:"no-store",signal:controller.signal});
+    if(!r.ok) throw new Error(sheetName+" 讀取失敗");
+    const rows=parseCsv(await r.text());
+    const headers=(rows[0]||[]).map(clean);
+    return rows.slice(1).map(row=>{
+      const o={};
+      headers.forEach((h,i)=>o[h]=clean(row[i]));
+      return o;
+    });
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
-    await autoPublish();
-    const rs=await Promise.all([csvSheet("工讀生名單"),csvSheet("工作任務"),csvSheet("報名紀錄"),csvSheet("假日設定")]);
-    workers=rs[0].slice(1).map(r=>clean(r[0])).filter(Boolean);
-    tasks=rowsToObjects(rs[1]);
-    signups=rowsToObjects(rs[2]).filter(r=>clean(r["姓名"]));
-    holidays=new Set(rs[3].slice(1).map(r=>{const d=taskDate(r[0]);return dateKey(d)}).filter(Boolean));
-    buildGroups();render();
-    document.getElementById("status").textContent="已同步 · "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Taipei"});
-    restoreLastSelection();
+    const [workerRows,taskRows,signupRows]=await Promise.all([
+      readSheet("工讀生名單"),
+      readSheet("工作任務"),
+      readSheet("報名紀錄")
+    ]);
+
+    workers=workerRows.map(r=>clean(r["姓名"])).filter(Boolean);
+    tasks=taskRows.filter(r=>clean(r["日期"])&&clean(r["地點"]));
+    signups=signupRows.filter(r=>clean(r["姓名"]));
+
+    render();
+
+    document.getElementById("status").textContent=
+      "已同步 · "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
   }catch(e){
     document.getElementById("status").textContent="同步失敗";
-    document.getElementById("content").innerHTML='<div class="card empty">目前無法讀取排班資料</div>';
-    show(e.message||"讀取失敗","error");
+    document.getElementById("content").innerHTML=
+      '<div class="card empty">目前無法讀取排班資料，請按「重新整理」再試一次。</div>';
+    show((e&&e.name==="AbortError")?"同步逾時，請重新整理":(e.message||"讀取失敗"),"error");
   }
+}
+
+function timeOptions(startTime){
+  const m=clean(startTime).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  let startMinutes=9*60;
+  if(m){
+    startMinutes=Number(m[1])*60+Number(m[2]);
+    startMinutes=Math.ceil(startMinutes/30)*30;
+  }
+  const endMinutes=18*60;
+  let html='<option value="">請選擇時間</option>';
+  for(let mins=startMinutes; mins<=endMinutes; mins+=30){
+    const h=String(Math.floor(mins/60)).padStart(2,"0");
+    const mm=String(mins%60).padStart(2,"0");
+    const v=h+":"+mm;
+    html+='<option value="'+v+'">'+v+'</option>';
+  }
+  return html;
 }
 
 function render(){
   const root=document.getElementById("content");
-  if(!groups.length){root.innerHTML='<div class="card empty">目前沒有工作任務</div>';return}
+  const groups=groupTasks(tasks);
+
+  if(!groups.length){
+    root.innerHTML='<div class="card empty">目前沒有工作任務</div>';
+    return;
+  }
 
   root.innerHTML=groups.map((g,i)=>{
-    const schools=g.tasks.map(t=>clean(t["地點"]));
-    const openTime=(g.tasks.map(t=>clean(t["開放時間"])).filter(Boolean).sort()[0]||"");
-    const published=g.mode==="一般"&&generalPublished(g.date);
-    const open=g.mode==="下午"?afternoonOpen(g):!published;
-    const lockedHoliday=g.mode==="下午"&&isHoliday(g.date);
-    const multi=schools.length>1;
-    const title=multi?(g.time+" 排班"):schools[0];
+    const people=groupPeople(g);
 
-    let banner="";
-    if(g.mode==="一般"){
-      banner=published?'<div class="info">排程已公布，請選擇姓名查看指派學校</div>':'<div class="info">此班次將於前一天 18:30 公布指派結果；公布前可修改或取消</div>';
-    }else{
-      banner=lockedHoliday?'<div class="locked">假日不開放下午報名</div>':(!open?'<div class="locked">'+esc(openTime||"11:30")+' 開放報名</div>':'<div class="info">報名後立即分派並公布，之後如需異動請聯絡 Jimmy 或是人資</div>');
-    }
+    const opts='<option value="">請選擇姓名</option>'+
+      workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
 
-    const opts='<option value="">請選擇姓名</option>'+workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
-    const times=Array.from({length:48},(_,n)=>{const h=Math.floor(n/2),m=n%2?"30":"00",v=String(h).padStart(2,"0")+":"+m;return '<option value="'+v+'">'+v+'</option>'}).join("");
+    const peopleHtml=people.length
+      ?people.map(p=>
+        '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
+      ).join("")
+      :'<div class="empty">目前尚無人登記</div>';
 
-    const allowInput=g.mode==="一般"?!published:open;
+    const schoolsHtml=g.schools.map(x=>
+      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
+    ).join("");
+
     return '<section class="card">'+
-      '<div class="head"><div><div class="title">'+esc(title)+'</div>'+
-      '<div class="meta"><span class="pill">'+esc(g.date)+'</span><span class="pill">開始 '+esc(g.time)+'</span><span class="pill">'+(g.mode==="下午"?"下午排程":"一般排程")+'</span></div></div></div>'+
-      (multi?'<div class="school-list">可分派學校：'+schools.map(esc).join("、")+'</div>':'')+
-      banner+
-      '<hr><label>姓名</label><select id="name_'+i+'" onchange="syncExisting('+i+')">'+opts+'</select>'+
-      '<div id="hint_'+i+'" class="hint"></div>'+
-      '<label>可出勤到幾點</label><select id="until_'+i+'" '+(!allowInput?'disabled':'')+'><option value="">請選擇時間</option>'+times+'</select>'+
-      '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')" '+(!allowInput?'disabled':'')+'>'+(!allowInput?(published?"排程已公布":"尚未開放報名"):"確認可以上班")+'</button>'+
-      '<button id="cancel_'+i+'" class="cancel" onclick="cancelSignup('+i+')">取消出勤</button>'+
+      '<div class="head"><div><div class="place">'+esc(scheduleTitle(g.date))+'</div>'+
+      '<div class="meta">'+
+      (g.headcount?'<span class="pill">需求 '+esc(g.headcount)+' 人</span>':'')+
+      '</div>'+
+      '<div class="school-block"><div class="school-label">可能分派學校</div>'+
+      '<div class="school-list">'+schoolsHtml+'</div></div>'+
+      '</div><div class="count">已登記 '+people.length+
+      (g.headcount?'/'+esc(g.headcount):'')+
+      '</div></div>'+
+      '<hr>'+
+      '<label>姓名</label>'+
+      '<select id="name_'+i+'">'+opts+'</select>'+
+      '<label>可出勤到幾點</label>'+
+      '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
+      '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+      '<hr>'+
+      '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
+      '<div class="people">'+peopleHtml+'</div>'+
       '</section>';
   }).join("");
 }
 
-function syncExisting(i){
-  const g=groups[i],name=clean(document.getElementById("name_"+i).value);
-  const until=document.getElementById("until_"+i),hint=document.getElementById("hint_"+i),btn=document.getElementById("btn_"+i),cancel=document.getElementById("cancel_"+i);
-  cancel.style.display="none";
-  if(!name){hint.textContent="";return}
-  const s=findSignup(g,name);
+async function submitSignup(i){
+  const groups=groupTasks(tasks);
+  const group=groups[i];
+  const name=clean(document.getElementById("name_"+i).value);
+  const until=clean(document.getElementById("until_"+i).value);
 
-  if(s&&activeSignup(s)){
-    const published=clean(s["排程狀態"])==="已公布";
-    if(published){
-      until.value=clean(s["可出勤到幾點"]);
-      until.disabled=true;btn.disabled=true;btn.textContent="排程已公布";
-      hint.textContent="指派學校："+(clean(s["指派學校"])||clean(s["地點"]))+"｜如需異動請聯絡 Jimmy 或是人資";
-      hint.className="hint active";
-    }else{
-      until.value=clean(s["可出勤到幾點"]);
-      until.disabled=false;btn.disabled=false;btn.textContent="更新出勤時間";
-      hint.textContent="你已登記，公布前可以修改時間或取消";
-      hint.className="hint active";
-      cancel.style.display="block";
-    }
-  }else if(s){
-    until.value="";
-    hint.textContent="你之前已取消，可重新報名";
-    hint.className="hint";
-  }else{
-    hint.textContent=g.mode==="一般"&&generalPublished(g.date)?"你沒有這個班次的報名紀錄":"尚未登記";
-    hint.className="hint";
+  if(!name){
+    show("請先選擇姓名","error");
+    return;
+  }
+
+  if(!until){
+    show("請填寫可出勤到幾點","error");
+    return;
+  }
+
+  const btn=document.getElementById("btn_"+i);
+  btn.disabled=true;
+  btn.textContent="送出中…";
+
+  try{
+    await fetch(API,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({
+        action:"signup",
+        date:group.date,
+        place:"待分派",
+        location:"待分派",
+        shiftTime:group.rawTime,
+        time:group.rawTime,
+        mode:group.mode || "一般",
+        name:name,
+        until:until
+      })
+    });
+
+    show("已送出登記","ok");
+    await new Promise(r=>setTimeout(r,900));
+    await loadAll();
+  }catch(e){
+    show(e.message||"送出失敗","error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="確認可以上班";
   }
 }
 
-async function submitSignup(i){
-  const g=groups[i],name=clean(document.getElementById("name_"+i).value),until=clean(document.getElementById("until_"+i).value);
-  if(!name)return show("請先選擇姓名","error");
-  if(!until)return show("請選擇可出勤時間","error");
-  if(g.mode==="一般"&&generalPublished(g.date))return show("排程已公布，如需異動請聯絡 Jimmy 或是人資","error");
-  if(g.mode==="下午"&&!afternoonOpen(g))return show(isHoliday(g.date)?"假日不開放下午報名":"尚未到開放時間","error");
-
-  const btn=document.getElementById("btn_"+i);btn.disabled=true;btn.textContent="送出中…";
-  sessionStorage.setItem("ptLast",JSON.stringify({key:g.date+"||"+g.time+"||"+g.mode,name:name}));
-  try{
-    await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"signup",date:g.date,time:g.time,name:name,until:until,mode:g.mode})});
-    show(g.mode==="下午"?"已送出，系統正在分派":"已完成登記","ok");
-    setTimeout(loadAll,1400);
-  }catch(e){show("送出失敗，請再試一次","error")}
-  finally{btn.disabled=false}
-}
-
-async function cancelSignup(i){
-  const g=groups[i],name=clean(document.getElementById("name_"+i).value);
-  if(!name)return show("請先選擇姓名","error");
-  if(g.mode!=="一般"||generalPublished(g.date))return show("排程已公布，如需異動請聯絡 Jimmy 或是人資","error");
-  if(!confirm("確定取消這個班次的出勤嗎？"))return;
-  try{
-    await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"cancel",date:g.date,time:g.time,name:name,mode:g.mode})});
-    show("已取消出勤","ok");setTimeout(loadAll,1200);
-  }catch(e){show("取消失敗，請再試一次","error")}
-}
-
-function restoreLastSelection(){
-  try{
-    const p=JSON.parse(sessionStorage.getItem("ptLast")||"null");if(!p)return;
-    const i=groups.findIndex(g=>g.date+"||"+g.time+"||"+g.mode===p.key);if(i<0)return;
-    const el=document.getElementById("name_"+i);if(!el)return;el.value=p.name;syncExisting(i);
-  }catch(e){}
-}
-
-loadAll();
+ensureLatestVersion().finally(()=>loadAll());
 setInterval(loadAll,30000);
 </script>
 </body>
