@@ -44,12 +44,19 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2216";
+const BUILD_VERSION="20261002-2225";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
 const clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function maskName(name){
+  const s=clean(name);
+  if(!s) return "";
+  if(s.length===1) return s;
+  if(s.length===2) return s[0]+"○";
+  return s[0]+"○".repeat(s.length-2)+s[s.length-1];
+}
 
 async function ensureLatestVersion(){
   try{
@@ -260,7 +267,7 @@ function render(){
 
     const peopleHtml=people.length
       ?people.map(p=>
-        '<div class="person"><strong>'+esc(p["姓名"])+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
+        '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
       ).join("")
       :'<div class="empty">目前尚無人登記</div>';
 
