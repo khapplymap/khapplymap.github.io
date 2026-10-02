@@ -10,334 +10,222 @@ body{margin:0;background:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,"S
 main{max-width:760px;margin:0 auto;padding:20px 14px 40px}
 h1{margin:0;font-size:30px;font-weight:800}.sub{margin-top:6px;color:#6b7280}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin:18px 0 12px;color:#6b7280;font-size:14px}
-button.refresh{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
+.refresh{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 10px 30px rgba(17,24,39,.06)}
-.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.place{font-size:22px;font-weight:800}.count{font-size:14px;color:#6b7280;white-space:nowrap}
-.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.pill{background:#f3f4f6;border-radius:999px;padding:7px 10px;font-size:13px}
-hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
-label{display:block;font-weight:700;margin:12px 0 7px}
-select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;background:#fff;color:#111827;padding:0 14px;font-size:16px}
-
-.btn{width:100%;margin-top:14px;border:0;border-radius:14px;background:#111827;color:white;padding:14px 16px;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55}.cancel-btn{display:none;width:100%;margin-top:9px;border:1px solid #fecaca;border-radius:14px;background:#fff;color:#b91c1c;padding:12px 16px;font-size:15px;font-weight:800;cursor:pointer}
-.person{display:flex;justify-content:space-between;align-items:center;background:#fafafa;border:1px solid #eceff3;border-radius:12px;padding:10px 12px;margin-top:7px}.ptime{font-weight:800;color:#0f766e}
-.notice{display:none;margin:0 0 14px;padding:12px 14px;border-radius:14px}.notice.ok{display:block;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}.notice.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
-.empty{text-align:center;color:#6b7280;padding:12px}.locked{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;font-size:14px}.disabled-field{opacity:.55;pointer-events:none}.hint{font-size:13px;color:#6b7280;margin-top:7px}.hint.active{color:#0f766e;font-weight:700}
-@media(max-width:560px){main{padding:14px 12px 34px}.card{padding:16px;border-radius:18px}.place{font-size:20px}}
+.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.title{font-size:22px;font-weight:800}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.pill{background:#f3f4f6;padding:7px 10px;border-radius:999px;font-size:13px}
+.school-list{margin-top:10px;color:#374151;font-size:14px;line-height:1.7}
+label{display:block;font-weight:700;margin:13px 0 7px}
+select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;padding:0 14px;font-size:16px;background:#fff;color:#111827}
+.btn{width:100%;margin-top:14px;height:50px;border:0;border-radius:14px;background:#111827;color:#fff;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55;cursor:not-allowed}
+.cancel{display:none;width:100%;margin-top:9px;height:46px;border:1px solid #fecaca;border-radius:14px;background:#fff;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer}
+.notice{display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px}.notice.error{display:block;border:1px solid #fecaca;background:#fef2f2;color:#991b1b}.notice.ok{display:block;border:1px solid #a7f3d0;background:#ecfdf5;color:#065f46}
+.info{margin-top:10px;padding:11px 12px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-weight:700;font-size:14px}
+.locked{margin-top:10px;padding:11px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;font-size:14px}
+.hint{font-size:13px;color:#6b7280;margin-top:7px}.hint.active{color:#0f766e;font-weight:700}
+hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}.empty{text-align:center;color:#6b7280;padding:18px}
+@media(max-width:560px){main{padding:14px 12px 36px}h1{font-size:27px}.card{padding:16px}.title{font-size:20px}}
 </style>
 </head>
 <body>
 <main>
 <h1>工讀排班</h1>
-<div class="sub">選擇工作任務，登記你可以出勤到幾點</div>
+<div class="sub">登記可出勤時間；多校班次由系統分派</div>
 <div id="notice" class="notice"></div>
-<div class="toolbar">
-  <span id="status">同步中…</span>
-  <button class="refresh" onclick="loadAll()">重新整理</button>
-</div>
+<div class="toolbar"><span id="status">同步中…</span><button class="refresh" onclick="loadAll()">重新整理</button></div>
 <div id="content"><div class="card empty">載入資料中…</div></div>
 </main>
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let workers=[],tasks=[],signups=[],holidayDates=new Set();
+let workers=[],tasks=[],signups=[],holidays=new Set(),groups=[];
 
 function clean(v){return String(v==null?"":v).trim()}
-function esc(v){return clean(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]})}
-function taipeiToday(){
-  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
-  const y=Number(parts.find(p=>p.type==="year").value);
-  const m=Number(parts.find(p=>p.type==="month").value);
-  const d=Number(parts.find(p=>p.type==="day").value);
-  return new Date(y,m-1,d);
-}
-function taskDate(raw){
-  const s=clean(raw);
-  if(!s)return null;
-  let m=s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-  if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
-  m=s.match(/^(\d{1,2})[\/-](\d{1,2})$/);
-  if(m){
-    const today=taipeiToday();
-    return new Date(today.getFullYear(),Number(m[1])-1,Number(m[2]));
-  }
-  return null;
-}
-function parseClock(raw){
-  const s=clean(raw);
-  if(!s)return null;
-  const m=s.match(/^(\d{1,2}):(\d{2})$/);
-  if(!m)return null;
-  return {h:Number(m[1]),m:Number(m[2])};
-}
-function taipeiNowParts(){
-  const parts=new Intl.DateTimeFormat("en-CA",{
-    timeZone:"Asia/Taipei",
-    year:"numeric",
-    month:"2-digit",
-    day:"2-digit",
-    hour:"2-digit",
-    minute:"2-digit",
-    hourCycle:"h23"
-  }).formatToParts(new Date());
-  const get=t=>Number(parts.find(p=>p.type===t).value);
-  return {y:get("year"),m:get("month"),d:get("day"),h:get("hour"),min:get("minute")};
-}
-function isCurrentOrFutureTask(row){
-  const d=taskDate(row["日期"]);
-  if(!d)return true;
-  return d>=taipeiToday();
-}
-function dateKey(d){
-  if(!d)return "";
-  return d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getDate()).padStart(2,"0");
-}
-function isHolidayTask(row){
-  const d=taskDate(row["日期"]);
-  if(!d)return false;
-  const day=d.getDay();
-  return day===0 || day===6 || holidayDates.has(dateKey(d));
-}
-function isTaskOpen(row){
-  const openRaw=clean(row["開放時間"]);
-  if(!openRaw)return true;
+function esc(v){return clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function show(msg,type="ok"){const n=document.getElementById("notice");n.textContent=msg;n.className="notice "+type;clearTimeout(window.__notice);window.__notice=setTimeout(()=>n.className="notice",3000)}
 
-  if(isHolidayTask(row))return false;
-
-  const d=taskDate(row["日期"]);
-  const clock=parseClock(openRaw);
-  if(!d||!clock)return true;
-
-  const now=taipeiNowParts();
-  const taskY=d.getFullYear();
-  const taskM=d.getMonth()+1;
-  const taskD=d.getDate();
-
-  if(now.y<taskY)return false;
-  if(now.y>taskY)return true;
-  if(now.m<taskM)return false;
-  if(now.m>taskM)return true;
-  if(now.d<taskD)return false;
-  if(now.d>taskD)return true;
-
-  const nowMinutes=now.h*60+now.min;
-  const openMinutes=clock.h*60+clock.m;
-  return nowMinutes>=openMinutes;
-}
-function show(msg,type){
-  const n=document.getElementById("notice");
-  n.textContent=msg;
-  n.className="notice "+(type==="err"?"err":"ok");
-  clearTimeout(window.__n);
-  window.__n=setTimeout(function(){n.className="notice";n.style.display="none"},3000);
-}
 function parseCsv(text){
-  const rows=[]; let row=[],cell="",q=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i],next=text[i+1];
-    if(ch==='"'){
-      if(q&&next==='"'){cell+='"';i++}
-      else q=!q;
-    }else if(ch===","&&!q){row.push(cell);cell=""}
-    else if((ch==="\n"||ch==="\r")&&!q){
-      if(ch==="\r"&&next==="\n")i++;
-      row.push(cell); rows.push(row); row=[]; cell="";
-    }else cell+=ch;
+  const out=[];let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];
+    if(ch==='"'){if(q&&next==='"'){cell+='"';i++}else q=!q}
+    else if(ch===","&&!q){row.push(cell);cell=""}
+    else if((ch==="\n"||ch==="\r")&&!q){if(ch==="\r"&&next==="\n")i++;row.push(cell);out.push(row);row=[];cell=""}
+    else cell+=ch;
   }
-  if(cell.length||row.length){row.push(cell);rows.push(row)}
-  return rows;
+  if(cell.length||row.length){row.push(cell);out.push(row)}return out;
 }
 async function csvSheet(name){
-  const url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(name)+"&_="+Date.now();
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok)throw new Error("無法讀取 "+name);
-  return parseCsv(await r.text());
+  const u="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(name)+"&_="+Date.now();
+  const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw Error("無法讀取 "+name);return parseCsv(await r.text());
 }
+function rowsToObjects(rows){const h=(rows[0]||[]).map(clean);return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=clean(r[i]));return o})}
+
+function todayParts(){
+  const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const get=t=>Number(p.find(x=>x.type===t).value);return {y:get("year"),m:get("month"),d:get("day"),h:get("hour"),min:get("minute")};
+}
+function taskDate(raw){
+  const s=clean(raw);let m=s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})$/);if(!m)return null;
+  return new Date(todayParts().y,+m[1]-1,+m[2]);
+}
+function dateKey(d){return d?d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getDate()).padStart(2,"0"):""}
+function isFutureOrToday(raw){const d=taskDate(raw);if(!d)return true;const n=todayParts();const t=new Date(n.y,n.m-1,n.d);return d>=t}
+function isHoliday(raw){const d=taskDate(raw);if(!d)return false;return d.getDay()===0||d.getDay()===6||holidays.has(dateKey(d))}
+function modeOf(t){return clean(t["開放時間"])?"下午":"一般"}
+function groupKey(t){return clean(t["日期"])+"||"+clean(t["時間"])+"||"+modeOf(t)}
+function generalPublished(dateRaw){
+  const d=taskDate(dateRaw);if(!d)return false;const n=todayParts();
+  const now=new Date(n.y,n.m-1,n.d,n.h,n.min);
+  const pub=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1,18,30);
+  return now>=pub;
+}
+function afternoonOpen(g){
+  if(g.mode!=="下午")return true;
+  if(isHoliday(g.date))return false;
+  const d=taskDate(g.date);if(!d)return false;
+  const n=todayParts();const now=new Date(n.y,n.m-1,n.d,n.h,n.min);
+  const open=(g.tasks.map(t=>clean(t["開放時間"])).filter(Boolean).sort()[0]||"11:30").split(":");
+  return now>=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Number(open[0])||0,Number(open[1])||0);
+}
+function activeSignup(s){const v=clean(s["狀態"]);return !v||v==="已報名"}
+function findSignup(g,name){
+  return signups.find(s=>clean(s["日期"])===g.date&&clean(s["班次時間"])===g.time&&clean(s["排程類型"])===g.mode&&clean(s["姓名"])===name);
+}
+function buildGroups(){
+  const m={};
+  tasks.filter(t=>clean(t["日期"])&&clean(t["地點"])&&isFutureOrToday(t["日期"])).forEach(t=>{
+    const k=groupKey(t);if(!m[k])m[k]={date:clean(t["日期"]),time:clean(t["時間"]),mode:modeOf(t),tasks:[]};m[k].tasks.push(t);
+  });
+  groups=Object.values(m).sort((a,b)=>{const da=taskDate(a.date),db=taskDate(b.date);return (da-db)||a.time.localeCompare(b.time)||a.mode.localeCompare(b.mode)});
+}
+async function autoPublish(){
+  try{await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"autoPublish"})})}catch(e){}
+}
+
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
-    const rs=await Promise.all([
-      csvSheet("工讀生名單"),
-      csvSheet("工作任務"),
-      csvSheet("報名紀錄"),
-      csvSheet("假日設定")
-    ]);
-
-    const wr=rs[0],tr=rs[1],sr=rs[2],hr=rs[3];
-
-    holidayDates=new Set(
-      hr.slice(1).map(function(r){
-        const raw=clean(r[0]);
-        const m=raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-        if(!m)return "";
-        return m[1]+"/"+String(Number(m[2])).padStart(2,"0")+"/"+String(Number(m[3])).padStart(2,"0");
-      }).filter(Boolean)
-    );
-
-    workers=wr.slice(1).map(function(r){return clean(r[0])}).filter(Boolean);
-
-    const th=(tr[0]||[]).map(clean);
-    tasks=tr.slice(1).map(function(r){
-      const o={}; th.forEach(function(h,i){o[h]=clean(r[i])}); return o;
-    }).filter(function(o){return o["日期"]&&o["地點"]&&isCurrentOrFutureTask(o)});
-
-    const sh=(sr[0]||[]).map(clean);
-    signups=sr.slice(1).map(function(r){
-      const o={}; sh.forEach(function(h,i){o[h]=clean(r[i])}); return o;
-    }).filter(function(o){return o["姓名"]});
-
-    render();
-    document.getElementById("status").textContent="已同步 · "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false});
+    await autoPublish();
+    const rs=await Promise.all([csvSheet("工讀生名單"),csvSheet("工作任務"),csvSheet("報名紀錄"),csvSheet("假日設定")]);
+    workers=rs[0].slice(1).map(r=>clean(r[0])).filter(Boolean);
+    tasks=rowsToObjects(rs[1]);
+    signups=rowsToObjects(rs[2]).filter(r=>clean(r["姓名"]));
+    holidays=new Set(rs[3].slice(1).map(r=>{const d=taskDate(r[0]);return dateKey(d)}).filter(Boolean));
+    buildGroups();render();
+    document.getElementById("status").textContent="已同步 · "+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Taipei"});
+    restoreLastSelection();
   }catch(e){
     document.getElementById("status").textContent="同步失敗";
     document.getElementById("content").innerHTML='<div class="card empty">目前無法讀取排班資料</div>';
-    show(e.message||"讀取失敗","err");
+    show(e.message||"讀取失敗","error");
   }
 }
-function k(o){return clean(o["日期"])+"||"+clean(o["地點"])}
-function isActiveSignup(s){
-  const status=clean(s["狀態"]);
-  return !status||status==="已報名";
-}
-function isTaskToday(t){
-  const d=taskDate(t["日期"]);
-  const today=taipeiToday();
-  return !!d && d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && d.getDate()===today.getDate();
-}
+
 function render(){
   const root=document.getElementById("content");
-  if(!tasks.length){root.innerHTML='<div class="card empty">目前沒有工作任務</div>';return}
-  root.innerHTML=tasks.map(function(t,i){
-    const people=signups.filter(function(s){return k(s)===k(t)});
-    const opened=isTaskOpen(t);
-    const openTime=clean(t["開放時間"]);
-    const holidayLocked=!!openTime&&isHolidayTask(t);
-    const opts='<option value="">請選擇姓名</option>'+workers.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join("");
-    const peopleHtml=people.length?people.map(function(p){return '<div class="person"><strong>'+esc(p["姓名"])+'</strong><span class="ptime">'+esc(p["可出勤到幾點"])+'</span></div>'}).join(""):'<div class="empty">目前尚無人登記</div>';
+  if(!groups.length){root.innerHTML='<div class="card empty">目前沒有工作任務</div>';return}
+
+  root.innerHTML=groups.map((g,i)=>{
+    const schools=g.tasks.map(t=>clean(t["地點"]));
+    const openTime=(g.tasks.map(t=>clean(t["開放時間"])).filter(Boolean).sort()[0]||"");
+    const published=g.mode==="一般"&&generalPublished(g.date);
+    const open=g.mode==="下午"?afternoonOpen(g):!published;
+    const lockedHoliday=g.mode==="下午"&&isHoliday(g.date);
+    const multi=schools.length>1;
+    const title=multi?(g.time+" 排班"):schools[0];
+
+    let banner="";
+    if(g.mode==="一般"){
+      banner=published?'<div class="info">排程已公布，請選擇姓名查看指派學校</div>':'<div class="info">此班次將於前一天 18:30 公布指派結果；公布前可修改或取消</div>';
+    }else{
+      banner=lockedHoliday?'<div class="locked">假日不開放下午報名</div>':(!open?'<div class="locked">'+esc(openTime||"11:30")+' 開放報名</div>':'<div class="info">報名後立即分派並公布，之後如需異動請聯絡 Jimmy 或是人資</div>');
+    }
+
+    const opts='<option value="">請選擇姓名</option>'+workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
+    const times=Array.from({length:48},(_,n)=>{const h=Math.floor(n/2),m=n%2?"30":"00",v=String(h).padStart(2,"0")+":"+m;return '<option value="'+v+'">'+v+'</option>'}).join("");
+
+    const allowInput=g.mode==="一般"?!published:open;
     return '<section class="card">'+
-      '<div class="head"><div><div class="place">'+esc(t["地點"])+'</div><div class="meta">'+
-      '<span class="pill">'+esc(t["日期"])+'</span>'+
-      (t["時間"]?'<span class="pill">開始 '+esc(t["時間"])+'</span>':'')+
-      (t["人數"]?'<span class="pill">需求 '+esc(t["人數"])+' 人</span>':'')+
-      '</div></div></div>'+
-      (!opened&&openTime?'<div class="locked">'+(holidayLocked?'假日不開放報名':esc(openTime)+' 開放報名')+'</div>':'')+
-      '<hr><label>姓名</label><select id="name_'+i+'" onchange="syncExisting('+i+')" '+(!opened?'disabled':'')+'>'+opts+'</select>'+
-      '<div id="hint_'+i+'" class="hint">如果之前已登記，重新選擇姓名即可修改時間</div>'+
-      '<label>可出勤到幾點</label>'+
-      '<select id="until_'+i+'" '+(!opened?'disabled':'')+'><option value="">請選擇時間</option>'+
-      Array.from({length:48},function(_,n){
-        const h=Math.floor(n/2);
-        const m=n%2===0?"00":"30";
-        const v=String(h).padStart(2,"0")+":"+m;
-        return '<option value="'+v+'">'+v+'</option>';
-      }).join("")+
-      '</select>'+
-      '<button class="btn" id="btn_'+i+'" onclick="submitSignup('+i+')" '+(!opened?'disabled':'')+'>'+(!opened?(holidayLocked?'假日不開放報名':'尚未開放報名'):'確認可以上班')+'</button>'+
-      '<button class="cancel-btn" id="cancel_'+i+'" onclick="cancelSignup('+i+')">取消出勤</button>'+
-      
+      '<div class="head"><div><div class="title">'+esc(title)+'</div>'+
+      '<div class="meta"><span class="pill">'+esc(g.date)+'</span><span class="pill">開始 '+esc(g.time)+'</span><span class="pill">'+(g.mode==="下午"?"下午排程":"一般排程")+'</span></div></div></div>'+
+      (multi?'<div class="school-list">可分派學校：'+schools.map(esc).join("、")+'</div>':'')+
+      banner+
+      '<hr><label>姓名</label><select id="name_'+i+'" onchange="syncExisting('+i+')">'+opts+'</select>'+
+      '<div id="hint_'+i+'" class="hint"></div>'+
+      '<label>可出勤到幾點</label><select id="until_'+i+'" '+(!allowInput?'disabled':'')+'><option value="">請選擇時間</option>'+times+'</select>'+
+      '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')" '+(!allowInput?'disabled':'')+'>'+(!allowInput?(published?"排程已公布":"尚未開放報名"):"確認可以上班")+'</button>'+
+      '<button id="cancel_'+i+'" class="cancel" onclick="cancelSignup('+i+')">取消出勤</button>'+
       '</section>';
   }).join("");
 }
+
 function syncExisting(i){
-  const t=tasks[i];
-  const name=clean(document.getElementById("name_"+i).value);
-  const untilEl=document.getElementById("until_"+i);
-  const hint=document.getElementById("hint_"+i);
-  const cancelBtn=document.getElementById("cancel_"+i);
+  const g=groups[i],name=clean(document.getElementById("name_"+i).value);
+  const until=document.getElementById("until_"+i),hint=document.getElementById("hint_"+i),btn=document.getElementById("btn_"+i),cancel=document.getElementById("cancel_"+i);
+  cancel.style.display="none";
+  if(!name){hint.textContent="";return}
+  const s=findSignup(g,name);
 
-  cancelBtn.style.display="none";
-
-  if(!name){
-    untilEl.value="";
-    hint.textContent="如果之前已登記，重新選擇姓名即可修改時間";
-    hint.className="hint";
-    return;
-  }
-
-  const found=signups.find(function(s){
-    return k(s)===k(t)&&clean(s["姓名"])===name;
-  });
-
-  if(found && isActiveSignup(found)){
-    untilEl.value=clean(found["可出勤到幾點"]);
-    if(isTaskToday(t)){
-      hint.textContent="你已登記；今天如需取消，請聯絡正職人員";
+  if(s&&activeSignup(s)){
+    const published=clean(s["排程狀態"])==="已公布";
+    if(published){
+      until.value=clean(s["可出勤到幾點"]);
+      until.disabled=true;btn.disabled=true;btn.textContent="排程已公布";
+      hint.textContent="指派學校："+(clean(s["指派學校"])||clean(s["地點"]))+"｜如需異動請聯絡 Jimmy 或是人資";
       hint.className="hint active";
     }else{
-      hint.textContent="你已登記，可修改時間或取消出勤";
+      until.value=clean(s["可出勤到幾點"]);
+      until.disabled=false;btn.disabled=false;btn.textContent="更新出勤時間";
+      hint.textContent="你已登記，公布前可以修改時間或取消";
       hint.className="hint active";
-      cancelBtn.style.display="block";
+      cancel.style.display="block";
     }
-  }else if(found){
-    untilEl.value="";
-    hint.textContent="你之前已取消，可重新選擇時間後再次報名";
+  }else if(s){
+    until.value="";
+    hint.textContent="你之前已取消，可重新報名";
     hint.className="hint";
   }else{
-    untilEl.value="";
-    hint.textContent="尚未登記";
+    hint.textContent=g.mode==="一般"&&generalPublished(g.date)?"你沒有這個班次的報名紀錄":"尚未登記";
     hint.className="hint";
   }
 }
 
 async function submitSignup(i){
-  const t=tasks[i];
-  if(!isTaskOpen(t)){
-    if(clean(t["開放時間"])&&isHolidayTask(t))return show("假日不開放下午時段報名","err");
-    return show((clean(t["開放時間"])||"指定時間")+" 後才開放報名","err");
-  }
-  const name=clean(document.getElementById("name_"+i).value);
-  const until=clean(document.getElementById("until_"+i).value);
-  if(!name)return show("請先選擇姓名","err");
-  if(!until)return show("請選擇可出勤時間","err");
+  const g=groups[i],name=clean(document.getElementById("name_"+i).value),until=clean(document.getElementById("until_"+i).value);
+  if(!name)return show("請先選擇姓名","error");
+  if(!until)return show("請選擇可出勤時間","error");
+  if(g.mode==="一般"&&generalPublished(g.date))return show("排程已公布，如需異動請聯絡 Jimmy 或是人資","error");
+  if(g.mode==="下午"&&!afternoonOpen(g))return show(isHoliday(g.date)?"假日不開放下午報名":"尚未到開放時間","error");
+
   const btn=document.getElementById("btn_"+i);btn.disabled=true;btn.textContent="送出中…";
+  sessionStorage.setItem("ptLast",JSON.stringify({key:g.date+"||"+g.time+"||"+g.mode,name:name}));
   try{
-    await fetch(API,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({action:"signup",date:clean(t["日期"]),place:clean(t["地點"]),name:name,until:until})
-    });
-    const existing=signups.some(function(s){
-      return k(s)===k(t)&&clean(s["姓名"])===name;
-    });
-    show(existing?"已更新出勤時間":"已送出登記","ok");
-    setTimeout(loadAll,1200);
-  }catch(e){
-    show("送出失敗，請再試一次","err");
-  }finally{
-    btn.disabled=false;btn.textContent="確認可以上班";
-  }
+    await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"signup",date:g.date,time:g.time,name:name,until:until,mode:g.mode})});
+    show(g.mode==="下午"?"已送出，系統正在分派":"已完成登記","ok");
+    setTimeout(loadAll,1400);
+  }catch(e){show("送出失敗，請再試一次","error")}
+  finally{btn.disabled=false}
 }
+
 async function cancelSignup(i){
-  const t=tasks[i];
-  const name=clean(document.getElementById("name_"+i).value);
-  if(!name)return show("請先選擇姓名","err");
-  if(isTaskToday(t))return show("工作當天無法自行取消，請聯絡正職人員","err");
-  if(!confirm("確定要取消 "+clean(t["日期"])+" "+clean(t["地點"])+" 的出勤嗎？"))return;
-
-  const btn=document.getElementById("cancel_"+i);
-  btn.disabled=true;
-  btn.textContent="取消中…";
-
+  const g=groups[i],name=clean(document.getElementById("name_"+i).value);
+  if(!name)return show("請先選擇姓名","error");
+  if(g.mode!=="一般"||generalPublished(g.date))return show("排程已公布，如需異動請聯絡 Jimmy 或是人資","error");
+  if(!confirm("確定取消這個班次的出勤嗎？"))return;
   try{
-    await fetch(API,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({
-        action:"cancel",
-        date:clean(t["日期"]),
-        place:clean(t["地點"]),
-        name:name
-      })
-    });
-    show("已取消出勤","ok");
-    setTimeout(loadAll,1200);
-  }catch(e){
-    show("取消失敗，請再試一次","err");
-  }finally{
-    btn.disabled=false;
-    btn.textContent="取消出勤";
-  }
+    await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"cancel",date:g.date,time:g.time,name:name,mode:g.mode})});
+    show("已取消出勤","ok");setTimeout(loadAll,1200);
+  }catch(e){show("取消失敗，請再試一次","error")}
+}
+
+function restoreLastSelection(){
+  try{
+    const p=JSON.parse(sessionStorage.getItem("ptLast")||"null");if(!p)return;
+    const i=groups.findIndex(g=>g.date+"||"+g.time+"||"+g.mode===p.key);if(i<0)return;
+    const el=document.getElementById("name_"+i);if(!el)return;el.value=p.name;syncExisting(i);
+  }catch(e){}
 }
 
 loadAll();
