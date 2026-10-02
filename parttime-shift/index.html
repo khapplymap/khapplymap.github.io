@@ -140,7 +140,9 @@ function render(){
 async function submitSignup(i){
   const task=tasks[i];
   const name=clean(document.getElementById("name_"+i).value);
-  const hour=clean(document.getElementById("hour_"+i).value);\n  const minute=clean(document.getElementById("minute_"+i).value);\n  const until=(hour&&minute)?hour+":"+minute:"";
+  const hour=clean(document.getElementById("hour_"+i).value);
+  const minute=clean(document.getElementById("minute_"+i).value);
+  const until=(hour&&minute)?hour+":"+minute:"";
 
   if(!name){
     show("請先選擇姓名","error");
