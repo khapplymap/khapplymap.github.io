@@ -21,7 +21,7 @@ select{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;backgr
 .btn{width:100%;margin-top:14px;border:0;border-radius:14px;background:#111827;color:white;padding:14px 16px;font-size:16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55}
 .person{display:flex;justify-content:space-between;align-items:center;background:#fafafa;border:1px solid #eceff3;border-radius:12px;padding:10px 12px;margin-top:7px}.ptime{font-weight:800;color:#0f766e}
 .notice{display:none;margin:0 0 14px;padding:12px 14px;border-radius:14px}.notice.ok{display:block;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}.notice.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
-.empty{text-align:center;color:#6b7280;padding:12px}
+.empty{text-align:center;color:#6b7280;padding:12px}.hint{font-size:13px;color:#6b7280;margin-top:7px}.hint.active{color:#0f766e;font-weight:700}
 @media(max-width:560px){main{padding:14px 12px 34px}.card{padding:16px;border-radius:18px}.place{font-size:20px}}
 </style>
 </head>
@@ -141,7 +141,8 @@ function render(){
       (t["時間"]?'<span class="pill">開始 '+esc(t["時間"])+'</span>':'')+
       (t["人數"]?'<span class="pill">需求 '+esc(t["人數"])+' 人</span>':'')+
       '</div></div></div>'+
-      '<hr><label>姓名</label><select id="name_'+i+'">'+opts+'</select>'+
+      '<hr><label>姓名</label><select id="name_'+i+'" onchange="syncExisting('+i+')">'+opts+'</select>'+
+      '<div id="hint_'+i+'" class="hint">如果之前已登記，重新選擇姓名即可修改時間</div>'+
       '<label>可出勤到幾點</label>'+
       '<select id="until_'+i+'"><option value="">請選擇時間</option>'+
       Array.from({length:48},function(_,n){
@@ -156,6 +157,34 @@ function render(){
       '</section>';
   }).join("");
 }
+function syncExisting(i){
+  const t=tasks[i];
+  const name=clean(document.getElementById("name_"+i).value);
+  const untilEl=document.getElementById("until_"+i);
+  const hint=document.getElementById("hint_"+i);
+
+  if(!name){
+    untilEl.value="";
+    hint.textContent="如果之前已登記，重新選擇姓名即可修改時間";
+    hint.className="hint";
+    return;
+  }
+
+  const found=signups.find(function(s){
+    return k(s)===k(t)&&clean(s["姓名"])===name;
+  });
+
+  if(found){
+    untilEl.value=clean(found["可出勤到幾點"]);
+    hint.textContent="你已經登記過，可重新選擇時間後再次送出更新";
+    hint.className="hint active";
+  }else{
+    untilEl.value="";
+    hint.textContent="尚未登記";
+    hint.className="hint";
+  }
+}
+
 async function submitSignup(i){
   const t=tasks[i];
   const name=clean(document.getElementById("name_"+i).value);
@@ -170,7 +199,10 @@ async function submitSignup(i){
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify({action:"signup",date:clean(t["日期"]),place:clean(t["地點"]),name:name,until:until})
     });
-    show("已送出登記","ok");
+    const existing=signups.some(function(s){
+      return k(s)===k(t)&&clean(s["姓名"])===name;
+    });
+    show(existing?"已更新出勤時間":"已送出登記","ok");
     setTimeout(loadAll,1200);
   }catch(e){
     show("送出失敗，請再試一次","err");
