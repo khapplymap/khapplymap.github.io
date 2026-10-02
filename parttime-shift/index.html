@@ -12,7 +12,7 @@ h1{font-size:30px;margin:4px 0 2px}.sub{color:#6b7280;margin-bottom:16px}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin:8px 0 14px;color:#6b7280;font-size:14px}
 .refresh{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 8px 28px rgba(0,0,0,.05)}
-.head{display:flex;justify-content:space-between;gap:12px}.place{font-size:22px;font-weight:800}.school-block{margin-top:14px}.school-label{font-size:18px;font-weight:900;color:#dc2626;margin-bottom:8px}.school-item{font-size:18px;font-weight:800;color:#dc2626;line-height:1.65}
+.head{display:flex;justify-content:space-between;gap:12px}.place{font-size:22px;font-weight:800}.school-block{margin-top:14px}.school-label{font-size:18px;font-weight:900;color:#dc2626;margin-bottom:8px}.school-item{font-size:18px;font-weight:800;color:#dc2626;line-height:1.65}.school-list{display:flex;flex-direction:column;gap:3px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.pill{background:#f3f4f6;padding:7px 10px;border-radius:999px;font-size:13px}
 .count{font-size:14px;color:#6b7280;white-space:nowrap}
 label{display:block;font-weight:700;margin:13px 0 7px}
@@ -55,8 +55,66 @@ function show(msg,type="ok"){
   window.__noticeTimer=setTimeout(()=>{n.className="notice";n.style.display="none"},2600);
 }
 
-function key(o){
-  return clean(o["日期"])+"||"+clean(o["地點"]);
+function activeSignup(s){
+  const status=clean(s["狀態"]);
+  return !status || status==="已報名";
+}
+
+function periodKey(timeText){
+  const m=clean(timeText).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return "all";
+  const h=Number(m[1]);
+  if(h<12) return "am";
+  if(h<18) return "pm";
+  return "eve";
+}
+
+function normalizeTimeText(v){
+  const m=clean(v).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return clean(v);
+  return String(Number(m[1])).padStart(2,"0")+":"+m[2];
+}
+
+function groupTasks(rows){
+  const map=new Map();
+  rows.forEach(t=>{
+    const date=clean(t["日期"]);
+    const period=periodKey(t["時間"]);
+    const k=date+"||"+period;
+    if(!map.has(k)){
+      map.set(k,{date,period,schools:[],headcount:"",shiftTime:""});
+    }
+    const g=map.get(k);
+    const school=clean(t["地點"]);
+    const time=normalizeTimeText(t["時間"]);
+    if(school) g.schools.push({school,time});
+    const n=Number(clean(t["人數"]));
+    if(n && (!g.headcount || n>Number(g.headcount))) g.headcount=String(n);
+    if(time && (!g.shiftTime || time<g.shiftTime)) g.shiftTime=time;
+  });
+  return Array.from(map.values());
+}
+
+function groupPeople(group){
+  const schoolNames=new Set(group.schools.map(x=>x.school));
+  const byName=new Map();
+  signups.forEach(s=>{
+    if(!activeSignup(s)) return;
+    if(clean(s["日期"])!==group.date) return;
+
+    const signupShift=normalizeTimeText(s["班次時間"]);
+    const sameShift=signupShift ? periodKey(signupShift)===group.period : false;
+    const place=clean(s["地點"]);
+    const legacyMatch=schoolNames.has(place);
+    const pendingMatch=place==="待分派" && (!signupShift || sameShift);
+
+    if(!(sameShift || legacyMatch || pendingMatch)) return;
+
+    const name=clean(s["姓名"]);
+    if(!name) return;
+    byName.set(name,s);
+  });
+  return Array.from(byName.values());
 }
 
 function scheduleTitle(dateText){
@@ -64,7 +122,6 @@ function scheduleTitle(dateText){
   if(d==="10/10") return "10/10（五）排班";
   return d ? d+" 排班" : "排班";
 }
-
 
 function parseCsv(text){
   const rows=[];
@@ -134,14 +191,15 @@ async function loadAll(){
 
 function render(){
   const root=document.getElementById("content");
+  const groups=groupTasks(tasks);
 
-  if(!tasks.length){
+  if(!groups.length){
     root.innerHTML='<div class="card empty">目前沒有工作任務</div>';
     return;
   }
 
-  root.innerHTML=tasks.map((t,i)=>{
-    const people=signups.filter(x=>key(x)===key(t));
+  root.innerHTML=groups.map((g,i)=>{
+    const people=groupPeople(g);
 
     const opts='<option value="">請選擇姓名</option>'+
       workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
@@ -152,15 +210,19 @@ function render(){
       ).join("")
       :'<div class="empty">目前尚無人登記</div>';
 
+    const schoolsHtml=g.schools.map(x=>
+      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
+    ).join("");
+
     return '<section class="card">'+
-      '<div class="head"><div><div class="place">'+esc(scheduleTitle(t["日期"]))+'</div>'+
+      '<div class="head"><div><div class="place">'+esc(scheduleTitle(g.date))+'</div>'+
       '<div class="meta">'+
-      (clean(t["人數"])?'<span class="pill">需求 '+esc(t["人數"])+' 人</span>':'')+
+      (g.headcount?'<span class="pill">需求 '+esc(g.headcount)+' 人</span>':'')+
       '</div>'+
       '<div class="school-block"><div class="school-label">可能分派學校</div>'+
-      '<div class="school-item">• '+esc(t["地點"])+(clean(t["時間"])?'｜'+esc(t["時間"]):'')+'</div></div>'+
+      '<div class="school-list">'+schoolsHtml+'</div></div>'+
       '</div><div class="count">已登記 '+people.length+
-      (clean(t["人數"])?'/'+esc(t["人數"]):'')+
+      (g.headcount?'/'+esc(g.headcount):'')+
       '</div></div>'+
       '<hr>'+
       '<label>姓名</label>'+
@@ -180,7 +242,8 @@ function render(){
 }
 
 async function submitSignup(i){
-  const task=tasks[i];
+  const groups=groupTasks(tasks);
+  const group=groups[i];
   const name=clean(document.getElementById("name_"+i).value);
   const hour=clean(document.getElementById("hour_"+i).value);
   const minute=clean(document.getElementById("minute_"+i).value);
@@ -207,8 +270,11 @@ async function submitSignup(i){
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify({
         action:"signup",
-        date:clean(task["日期"]),
-        place:clean(task["地點"]),
+        date:group.date,
+        place:"待分派",
+        location:"待分派",
+        shiftTime:group.shiftTime,
+        time:group.shiftTime,
         name:name,
         until:until
       })
