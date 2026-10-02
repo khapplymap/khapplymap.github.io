@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>工讀排班｜管理者</title>
+<title>工讀排班｜管理者 v2</title>
 <style>
 *{box-sizing:border-box}
 :root{--bg:#f5f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--primary:#111827;--red:#dc2626;--green:#047857;--amber:#b45309}
@@ -25,7 +25,7 @@ h1{margin:0;font-size:32px}.sub{color:var(--muted);margin-top:6px}.topbar{displa
 <body>
 <main>
   <h1>工讀排班｜管理者</h1>
-  <div class="sub">分配預覽：男女平均優先、可搬運人員平均分散，其餘隨機</div>
+  <div class="sub">分配預覽：男女平均優先、可搬運人員平均分散，其餘隨機</div><div style="font-size:12px;color:#9ca3af;margin-top:4px">測試版 v2｜可直接點人員下方按鈕手動調配</div>
   <div class="topbar">
     <div id="status" class="sub">同步中…</div>
     <button class="btn btn-light" onclick="loadAll()">重新整理資料</button>
@@ -160,14 +160,18 @@ function setManual(groupKey,name,place){
 
 function manualPersonHtml(group,p,current){
   const moveClass=p.move==="可"?"ok":p.move==="注意"?"warn":"";
-  return '<div class="person" style="grid-template-columns:minmax(90px,1.2fr) 54px 90px 90px minmax(120px,1.1fr)">'+
+  const places=[...group.schools.map(s=>s.name),"候補"];
+  const buttons=places.map(place=>{
+    const active=place===current;
+    return '<button type="button" onclick="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',\''+place.replace(/'/g,"\\'")+'\')" '+
+      'style="border:1px solid '+(active?'#111827':'#d1d5db')+';background:'+(active?'#111827':'#fff')+';color:'+(active?'#fff':'#111827')+';border-radius:9px;padding:7px 10px;font-weight:800;font-size:12px;cursor:pointer">'+esc(place)+'</button>';
+  }).join("");
+  return '<div class="person" style="grid-template-columns:minmax(90px,1.2fr) 54px 90px 90px;align-items:start">'+
     '<div class="name">'+esc(maskName(p.name))+'</div>'+
     '<div class="sex">'+esc(p.sex)+'</div>'+
     '<div class="until">'+esc(p.until||"-")+'</div>'+
     '<div class="move '+moveClass+'">'+esc(p.move?("搬運："+p.move):"")+'</div>'+
-    '<select onchange="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',this.value)" style="height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 8px;background:#fff">'+
-      assignmentChoices(group,current)+
-    '</select>'+
+    '<div style="grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><span style="font-size:12px;color:#6b7280;align-self:center;margin-right:2px">調整至</span>'+buttons+'</div>'+
   '</div>';
 }
 
