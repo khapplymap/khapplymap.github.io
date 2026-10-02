@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 <div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 2322</div></main>
 <script>
-const BUILD_VERSION="20261002-2322";
+const BUILD_VERSION="20261002-2328";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -149,8 +149,16 @@ function groupTasks(rows){
     const n=Number(clean(t["人數"]));
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
   });
+  function dateOrderValue(dateText){
+    const m=clean(dateText).match(/^(\d{1,2})\/(\d{1,2})$/);
+    if(!m) return Number.MAX_SAFE_INTEGER;
+    return Number(m[1])*100+Number(m[2]);
+  }
+
   return Array.from(map.values()).sort((a,b)=>{
-    if(a.date!==b.date) return a.date.localeCompare(b.date,"zh-Hant");
+    const da=dateOrderValue(a.date);
+    const db=dateOrderValue(b.date);
+    if(da!==db) return da-db;
     return (timeMinutes(a.rawTime)||0)-(timeMinutes(b.rawTime)||0);
   });
 }
