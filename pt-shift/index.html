@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2242";
+const BUILD_VERSION="20261002-2248";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -123,33 +123,26 @@ function groupTasks(rows){
     const displayTime=normalizeTimeText(rawTime);
     const mins=timeMinutes(rawTime);
     const isAfternoon=mins!==null && mins>=12*60;
+    const k=date+"||"+rawTime;
 
-    if(!map.has(date)){
-      map.set(date,{
+    if(!map.has(k)){
+      map.set(k,{
         date,
-        rawTime:"",
-        displayTime:"",
-        mode:"一般",
+        rawTime,
+        displayTime,
+        mode:isAfternoon?"下午":"一般",
+        isAfternoon,
         schools:[],
-        headcount:"",
-        hasSignupShift:false
+        headcount:""
       });
     }
 
-    const g=map.get(date);
+    const g=map.get(k);
     const school=clean(t["地點"]);
     if(school) g.schools.push({school,time:displayTime,isAfternoon});
 
     const n=Number(clean(t["人數"]));
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
-
-    if(!isAfternoon){
-      g.hasSignupShift=true;
-      if(!g.rawTime || (mins!==null && mins < timeMinutes(g.rawTime))){
-        g.rawTime=rawTime;
-        g.displayTime=displayTime;
-      }
-    }
   });
   return Array.from(map.values());
 }
@@ -167,7 +160,7 @@ function groupPeople(group){
       : false;
     const place=clean(s["地點"]);
     const legacyMatch=schoolNames.has(place);
-    const pendingMatch=place==="待分派" && (!signupShift || sameShift);
+    const pendingMatch=place==="待分派" && sameShift;
 
     if(!(sameShift || legacyMatch || pendingMatch)) return;
 
@@ -305,7 +298,7 @@ function render(){
       '</div><div class="count">已登記 '+people.length+
       (g.headcount?'/'+esc(g.headcount):'')+
       '</div></div>'+
-      (g.hasSignupShift
+      (!g.isAfternoon
         ? '<hr>'+
           '<label>姓名</label>'+
           '<select id="name_'+i+'">'+opts+'</select>'+
@@ -315,7 +308,7 @@ function render(){
           '<hr>'+
           '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
           '<div class="people">'+peopleHtml+'</div>'
-        : '<hr><div class="notice" style="display:block;background:#f9fafb;color:#6b7280">此日只有 12:00 以後的下午班，不開放自行報名</div>'
+        : '<hr><div class="notice" style="display:block;background:#f9fafb;color:#6b7280">下午班不開放自行報名</div>'
       )+
       '</section>';
   }).join("");
