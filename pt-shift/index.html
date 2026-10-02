@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2305";
+const BUILD_VERSION="20261002-2310";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -216,8 +216,9 @@ function taskIsoDate(dateText){
 
 function isWeekendIso(iso){
   if(!iso) return false;
-  const d=new Date(iso+"T00:00:00+08:00");
-  const day=d.getUTCDay();
+  const m=iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return false;
+  const day=new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]))).getUTCDay();
   return day===0||day===6;
 }
 
