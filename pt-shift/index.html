@@ -44,7 +44,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 </main>
 <script>
-const BUILD_VERSION="20261002-2236";
+const BUILD_VERSION="20261002-2242";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -109,29 +109,47 @@ function normalizeTimeText(v){
   return String(Number(m[1])).padStart(2,"0")+":"+m[2];
 }
 
+function timeMinutes(timeText){
+  const m=clean(timeText).match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(!m) return null;
+  return Number(m[1])*60+Number(m[2]);
+}
+
 function groupTasks(rows){
   const map=new Map();
   rows.forEach(t=>{
     const date=clean(t["日期"]);
     const rawTime=clean(t["時間"]);
     const displayTime=normalizeTimeText(rawTime);
-    const mode=clean(t["開放時間"]) ? "下午" : "一般";
-    const k=date+"||"+rawTime+"||"+mode;
-    if(!map.has(k)){
-      map.set(k,{
+    const mins=timeMinutes(rawTime);
+    const isAfternoon=mins!==null && mins>=12*60;
+
+    if(!map.has(date)){
+      map.set(date,{
         date,
-        rawTime,
-        displayTime,
-        mode,
+        rawTime:"",
+        displayTime:"",
+        mode:"一般",
         schools:[],
-        headcount:""
+        headcount:"",
+        hasSignupShift:false
       });
     }
-    const g=map.get(k);
+
+    const g=map.get(date);
     const school=clean(t["地點"]);
-    if(school) g.schools.push({school,time:displayTime});
+    if(school) g.schools.push({school,time:displayTime,isAfternoon});
+
     const n=Number(clean(t["人數"]));
     if(n) g.headcount=String((Number(g.headcount)||0)+n);
+
+    if(!isAfternoon){
+      g.hasSignupShift=true;
+      if(!g.rawTime || (mins!==null && mins < timeMinutes(g.rawTime))){
+        g.rawTime=rawTime;
+        g.displayTime=displayTime;
+      }
+    }
   });
   return Array.from(map.values());
 }
@@ -272,7 +290,9 @@ function render(){
       :'<div class="empty">目前尚無人登記</div>';
 
     const schoolsHtml=g.schools.map(x=>
-      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
+      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+
+      (x.isAfternoon?' <span style="font-size:13px;color:#6b7280;font-weight:700">（下午班）</span>':'')+
+      '</div>'
     ).join("");
 
     return '<section class="card">'+
@@ -285,15 +305,18 @@ function render(){
       '</div><div class="count">已登記 '+people.length+
       (g.headcount?'/'+esc(g.headcount):'')+
       '</div></div>'+
-      '<hr>'+
-      '<label>姓名</label>'+
-      '<select id="name_'+i+'">'+opts+'</select>'+
-      '<label>可出勤到幾點</label>'+
-      '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
-      '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
-      '<hr>'+
-      '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
-      '<div class="people">'+peopleHtml+'</div>'+
+      (g.hasSignupShift
+        ? '<hr>'+
+          '<label>姓名</label>'+
+          '<select id="name_'+i+'">'+opts+'</select>'+
+          '<label>可出勤到幾點</label>'+
+          '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
+          '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+          '<hr>'+
+          '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
+          '<div class="people">'+peopleHtml+'</div>'
+        : '<hr><div class="notice" style="display:block;background:#f9fafb;color:#6b7280">此日只有 12:00 以後的下午班，不開放自行報名</div>'
+      )+
       '</section>';
   }).join("");
 }
