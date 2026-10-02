@@ -115,7 +115,26 @@ async function loadAll(){
 }
 
 function activeRecord(r){const s=clean(r["狀態"]);return !s||s==="已報名"}
-function displaySchool(r){return clean(r["指派學校"])||clean(r["地點"])||"待分派"}
+function singleSchoolForRecord(r){
+  const date=clean(r["日期"]);
+  const shift=normalizeTimeText(r["班次時間"]);
+  const matches=tasks.filter(t=>clean(t["日期"])===date && normalizeTimeText(t["時間"])===shift);
+  const schools=[...new Set(matches.map(t=>clean(t["地點"])).filter(Boolean))];
+  return schools.length===1 ? schools[0] : "";
+}
+function displaySchool(r){
+  const assigned=clean(r["指派學校"]);
+  if(assigned) return assigned;
+  const place=clean(r["地點"]);
+  if(place && place!=="待分派") return place;
+  return singleSchoolForRecord(r)||"待分派";
+}
+function displayScheduleStatus(r){
+  if(!activeRecord(r)) return "已取消";
+  const status=clean(r["排程狀態"]);
+  if(status && status!=="待分派") return status;
+  return displaySchool(r)!=="待分派" ? "已分派" : "待分派";
+}
 
 function renderAttendance(){
   const df=clean(document.getElementById("dateFilter").value).toLowerCase();
@@ -144,7 +163,7 @@ function renderAttendance(){
       (clean(f["排程類型"])?'<span class="badge">'+esc(f["排程類型"])+'</span>':'')+
       '</div><div class="count">'+g.length+' 人</div></div>'+
       '<table><thead><tr><th>姓名</th><th>可出勤到</th><th>排程狀態</th><th>填寫時間</th><th>取消時間</th></tr></thead><tbody>'+
-      g.map(r=>'<tr><td>'+esc(r["姓名"])+'</td><td>'+esc(r["可出勤到幾點"])+'</td><td>'+esc(clean(r["排程狀態"])||(activeRecord(r)?"待分派":"已取消"))+'</td><td>'+esc(r["填寫時間"])+'</td><td>'+esc(r["取消時間"])+'</td></tr>').join("")+
+      g.map(r=>'<tr><td>'+esc(r["姓名"])+'</td><td>'+esc(r["可出勤到幾點"])+'</td><td>'+esc(displayScheduleStatus(r))+'</td><td>'+esc(r["填寫時間"])+'</td><td>'+esc(r["取消時間"])+'</td></tr>').join("")+
       '</tbody></table></section>';
   }).join("");
 }
