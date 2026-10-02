@@ -62,10 +62,54 @@ function taskDate(raw){
   }
   return null;
 }
+function parseClock(raw){
+  const s=clean(raw);
+  if(!s)return null;
+  const m=s.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m)return null;
+  return {h:Number(m[1]),m:Number(m[2])};
+}
+function taipeiNowParts(){
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Taipei",
+    year:"numeric",
+    month:"2-digit",
+    day:"2-digit",
+    hour:"2-digit",
+    minute:"2-digit",
+    hourCycle:"h23"
+  }).formatToParts(new Date());
+  const get=t=>Number(parts.find(p=>p.type===t).value);
+  return {y:get("year"),m:get("month"),d:get("day"),h:get("hour"),min:get("minute")};
+}
 function isCurrentOrFutureTask(row){
   const d=taskDate(row["日期"]);
   if(!d)return true;
   return d>=taipeiToday();
+}
+function isTaskOpen(row){
+  const openRaw=clean(row["開放時間"]);
+  if(!openRaw)return true;
+
+  const d=taskDate(row["日期"]);
+  const clock=parseClock(openRaw);
+  if(!d||!clock)return true;
+
+  const now=taipeiNowParts();
+  const taskY=d.getFullYear();
+  const taskM=d.getMonth()+1;
+  const taskD=d.getDate();
+
+  if(now.y<taskY)return false;
+  if(now.y>taskY)return true;
+  if(now.m<taskM)return false;
+  if(now.m>taskM)return true;
+  if(now.d<taskD)return false;
+  if(now.d>taskD)return true;
+
+  const nowMinutes=now.h*60+now.min;
+  const openMinutes=clock.h*60+clock.m;
+  return nowMinutes>=openMinutes;
 }
 function show(msg,type){
   const n=document.getElementById("notice");
@@ -112,7 +156,7 @@ async function loadAll(){
     const th=(tr[0]||[]).map(clean);
     tasks=tr.slice(1).map(function(r){
       const o={}; th.forEach(function(h,i){o[h]=clean(r[i])}); return o;
-    }).filter(function(o){return o["日期"]&&o["地點"]&&isCurrentOrFutureTask(o)});
+    }).filter(function(o){return o["日期"]&&o["地點"]&&isCurrentOrFutureTask(o)&&isTaskOpen(o)});
 
     const sh=(sr[0]||[]).map(clean);
     signups=sr.slice(1).map(function(r){
