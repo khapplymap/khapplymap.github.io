@@ -228,11 +228,7 @@ function render(){
       '<label>姓名</label>'+
       '<select id="name_'+i+'">'+opts+'</select>'+
       '<label>可出勤到幾點</label>'+
-      '<div class="time-row">'+
-      '<select id="hour_'+i+'"><option value="">小時</option>'+Array.from({length:24},(_,h)=>'<option value="'+String(h).padStart(2,"0")+'">'+String(h).padStart(2,"0")+'</option>').join("")+'</select>'+
-      '<div class="time-sep">:</div>'+
-      '<select id="minute_'+i+'"><option value="">分鐘</option><option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>'+
-      '</div>'+
+      '<input id="until_'+i+'" type="time" step="900">'+
       '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
       '<hr>'+
       '<strong>目前可出勤人員</strong>'+
@@ -245,9 +241,7 @@ async function submitSignup(i){
   const groups=groupTasks(tasks);
   const group=groups[i];
   const name=clean(document.getElementById("name_"+i).value);
-  const hour=clean(document.getElementById("hour_"+i).value);
-  const minute=clean(document.getElementById("minute_"+i).value);
-  const until=(hour&&minute)?hour+":"+minute:"";
+  const until=clean(document.getElementById("until_"+i).value);
 
   if(!name){
     show("請先選擇姓名","error");
