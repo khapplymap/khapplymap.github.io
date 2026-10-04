@@ -211,16 +211,21 @@ function taskIsoDate(dateText){
   return now.year+"-"+String(Number(m[1])).padStart(2,"0")+"-"+String(Number(m[2])).padStart(2,"0");
 }
 
-function afternoonSignupState(group){
-  if(!group.isAfternoon) return {open:true,reason:""};
+function signupState(group){
   const iso=taskIsoDate(group.date);
   const now=taipeiNowParts();
   const today=now.year+"-"+now.month+"-"+now.day;
-
-  if(iso!==today) return {open:false,reason:"當天 11:30 開放登記"};
-
   const mins=Number(now.hour)*60+Number(now.minute);
-  if(mins<11*60+30) return {open:false,reason:"當天 11:30 開放登記"};
+
+  if(group.isAfternoon){
+    if(iso!==today) return {open:false,reason:"當天 11:30 開放登記"};
+    if(mins<11*60+30) return {open:false,reason:"當天 11:30 開放登記"};
+    return {open:true,reason:""};
+  }
+
+  if(iso===today && mins>=10*60){
+    return {open:false,reason:"上午班已截止登記"};
+  }
 
   return {open:true,reason:""};
 }
@@ -434,7 +439,7 @@ function render(){
       (g.headcount?'/'+esc(g.headcount):'')+
       '</div></div>'+
       (()=>{
-        const state=afternoonSignupState(g);
+        const state=signupState(g);
         if(state.open){
           return '<hr>'+
             '<label>姓名</label>'+
