@@ -29,6 +29,10 @@ select{appearance:auto;-webkit-appearance:menulist}
 .notice.error{display:block;border-color:#fecaca;background:#fef2f2;color:#991b1b}
 .notice.ok{display:block;border-color:#a7f3d0;background:#ecfdf5;color:#065f46}
 hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
+.section-title{font-size:20px;font-weight:900;margin:22px 2px 12px}
+.section-title:first-child{margin-top:4px}
+.history-wrap{margin-top:26px;padding-top:4px;border-top:2px solid #e5e7eb}
+.history-card{opacity:.92}
 @media(max-width:560px){main{padding:14px 12px 36px}h1{font-size:27px}.card{border-radius:18px;padding:16px}.place{font-size:20px}}
 </style>
 </head>
@@ -403,6 +407,70 @@ function assignmentHtml(group,people){
     blocks+standby;
 }
 
+function isPastGroup(group){
+  const iso=taskIsoDate(group.date);
+  if(!iso) return false;
+  const now=taipeiNowParts();
+  const today=now.year+"-"+now.month+"-"+now.day;
+  return iso<today;
+}
+
+function renderGroupCard(g,i,isHistory){
+  const people=groupPeople(g);
+
+  const opts='<option value="">請選擇姓名</option>'+
+    workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
+
+  const peopleHtml=people.length
+    ?people.map(p=>
+      '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
+    ).join("")
+    :'<div class="empty">目前尚無人登記</div>';
+
+  const schoolsHtml=g.schools.map(x=>
+    '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
+  ).join("");
+
+  let actionHtml="";
+  if(isHistory){
+    actionHtml='<hr>'+
+      '<div style="font-weight:800;margin-bottom:6px">當日出勤人員</div>'+
+      '<div class="people">'+peopleHtml+'</div>';
+  }else{
+    const state=signupState(g);
+    if(state.open){
+      actionHtml='<hr>'+
+        '<label>姓名</label>'+
+        '<select id="name_'+i+'">'+opts+'</select>'+
+        '<label>可出勤到幾點</label>'+
+        '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
+        '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+        '<hr>'+
+        '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
+        '<div class="people">'+peopleHtml+'</div>';
+    }else{
+      actionHtml='<hr>'+
+        '<div class="notice" style="display:block;background:#f9fafb;color:#6b7280">'+esc(state.reason)+'</div>'+
+        '<div style="font-weight:800;margin:14px 0 6px">目前可出勤人員</div>'+
+        '<div class="people">'+peopleHtml+'</div>';
+    }
+  }
+
+  return '<section class="card'+(isHistory?' history-card':'')+'">'+
+    '<div class="head"><div><div class="place">'+esc(scheduleTitle(g.date))+'</div>'+
+    '<div class="meta">'+
+    (g.headcount?'<span class="pill">需求 '+esc(g.headcount)+' 人</span>':'')+
+    (isHistory?'<span class="pill">已結束</span>':'')+
+    '</div>'+
+    '<div class="school-block"><div class="school-label">可能分派學校</div>'+
+    '<div class="school-list">'+schoolsHtml+'</div></div>'+
+    '</div><div class="count">已登記 '+people.length+
+    (g.headcount?'/'+esc(g.headcount):'')+
+    '</div></div>'+
+    actionHtml+
+    '</section>';
+}
+
 function render(){
   const root=document.getElementById("content");
   const groups=groupTasks(tasks);
@@ -412,53 +480,27 @@ function render(){
     return;
   }
 
-  root.innerHTML=groups.map((g,i)=>{
-    const people=groupPeople(g);
+  const current=[];
+  const history=[];
+  groups.forEach((g,i)=>{
+    (isPastGroup(g)?history:current).push({g,i});
+  });
 
-    const opts='<option value="">請選擇姓名</option>'+
-      workers.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
+  let html="";
+  if(current.length){
+    html+='<div class="section-title">目前／未來排班</div>'+
+      current.map(x=>renderGroupCard(x.g,x.i,false)).join("");
+  }else{
+    html+='<div class="section-title">目前／未來排班</div><div class="card empty">目前沒有未來排班</div>';
+  }
 
-    const peopleHtml=people.length
-      ?people.map(p=>
-        '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
-      ).join("")
-      :'<div class="empty">目前尚無人登記</div>';
+  if(history.length){
+    html+='<div class="history-wrap"><div class="section-title">已結束排班</div>'+
+      history.slice().reverse().map(x=>renderGroupCard(x.g,x.i,true)).join("")+
+      '</div>';
+  }
 
-    const schoolsHtml=g.schools.map(x=>
-      '<div class="school-item">• '+esc(x.school)+(x.time?'｜'+esc(x.time):'')+'</div>'
-    ).join("");
-
-    return '<section class="card">'+
-      '<div class="head"><div><div class="place">'+esc(scheduleTitle(g.date))+'</div>'+
-      '<div class="meta">'+
-      (g.headcount?'<span class="pill">需求 '+esc(g.headcount)+' 人</span>':'')+
-      '</div>'+
-      '<div class="school-block"><div class="school-label">可能分派學校</div>'+
-      '<div class="school-list">'+schoolsHtml+'</div></div>'+
-      '</div><div class="count">已登記 '+people.length+
-      (g.headcount?'/'+esc(g.headcount):'')+
-      '</div></div>'+
-      (()=>{
-        const state=signupState(g);
-        if(state.open){
-          return '<hr>'+
-            '<label>姓名</label>'+
-            '<select id="name_'+i+'">'+opts+'</select>'+
-            '<label>可出勤到幾點</label>'+
-            '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
-            '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
-            '<hr>'+
-            '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
-            '<div class="people">'+peopleHtml+'</div>';
-        }
-        return '<hr>'+
-          '<div class="notice" style="display:block;background:#f9fafb;color:#6b7280">'+esc(state.reason)+'</div>'+
-          '<div style="font-weight:800;margin:14px 0 6px">目前可出勤人員</div>'+
-          '<div class="people">'+peopleHtml+'</div>';
-      })()+
-      '</section>';
-      '</section>';
-  }).join("");
+  root.innerHTML=html;
 }
 
 async function submitSignup(i){
