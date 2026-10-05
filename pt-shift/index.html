@@ -24,6 +24,8 @@ select{appearance:auto;-webkit-appearance:menulist}
 .btn{width:100%;margin-top:14px;height:50px;border:0;border-radius:14px;background:#111827;color:#fff;font-size:16px;font-weight:800;cursor:pointer}
 .btn:disabled{opacity:.55;cursor:wait}
 .btn-secondary{background:#fff;color:#111827;border:1px solid #d1d5db}
+.cancel-btn{display:none;width:100%;margin-top:9px;height:48px;border:1px solid #fecaca;border-radius:14px;background:#fff;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer}
+.cancel-btn:disabled{opacity:.55;cursor:wait}
 .person{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #eceff3;border-radius:12px;background:#fafafa;margin-top:7px}
 .time{font-weight:800;color:#0f766e}.empty{color:#6b7280;text-align:center;padding:12px}
 .notice{display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;border:1px solid #d1d5db;background:#fff}
@@ -47,9 +49,9 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
     <button class="refresh" onclick="loadAll()">重新整理</button>
   </div>
   <div id="content"><div class="card empty">同步資料中…</div></div>
-<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 1315</div></main>
+<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 1320</div></main>
 <script>
-const BUILD_VERSION="20261005-1315";
+const BUILD_VERSION="20261005-1320";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -214,6 +216,12 @@ function taskIsoDate(dateText){
   if(!m) return "";
   const now=taipeiNowParts();
   return now.year+"-"+String(Number(m[1])).padStart(2,"0")+"-"+String(Number(m[2])).padStart(2,"0");
+}
+
+function isTaskToday(group){
+  const now=taipeiNowParts();
+  const today=now.year+"-"+now.month+"-"+now.day;
+  return taskIsoDate(group.date)===today;
 }
 
 function signupState(group){
@@ -429,6 +437,7 @@ function handleNameChange(i){
   const nameEl=document.getElementById("name_"+i);
   const untilEl=document.getElementById("until_"+i);
   const btn=document.getElementById("btn_"+i);
+  const cancelBtn=document.getElementById("cancel_"+i);
   if(!nameEl||!untilEl||!btn) return;
 
   const existing=existingSignupFor(group,nameEl.value);
@@ -436,9 +445,19 @@ function handleNameChange(i){
     const current=normalizeTimeText(existing["可出勤到幾點"]);
     if(current) untilEl.value=current;
     btn.textContent="更新時間";
+    if(cancelBtn){
+      cancelBtn.style.display="block";
+      cancelBtn.disabled=isTaskToday(group);
+      cancelBtn.textContent=isTaskToday(group)?"工作當天請聯絡正職取消":"取消報名";
+    }
   }else{
     untilEl.value="";
     btn.textContent="確認可以上班";
+    if(cancelBtn){
+      cancelBtn.style.display="none";
+      cancelBtn.disabled=false;
+      cancelBtn.textContent="取消報名";
+    }
   }
 }
 
@@ -472,6 +491,7 @@ function renderGroupCard(g,i,isHistory){
         '<label>可出勤到幾點</label>'+
         '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
         '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+        '<button id="cancel_'+i+'" class="cancel-btn" onclick="cancelSignup('+i+')">取消報名</button>'+
         '<hr>'+
         '<div style="font-weight:800;margin-bottom:6px">目前可出勤人員</div>'+
         '<div class="people">'+peopleHtml+'</div>';
@@ -578,6 +598,65 @@ async function submitSignup(i){
     btn.disabled=false;
     const latest=existingSignupFor(group,name);
     btn.textContent=latest?"更新時間":"確認可以上班";
+  }
+}
+
+async function cancelSignup(i){
+  const groups=groupTasks(tasks);
+  const group=groups[i];
+  if(!group) return;
+
+  const name=clean(document.getElementById("name_"+i)?.value);
+  if(!name){
+    show("請先選擇姓名","error");
+    return;
+  }
+
+  const existing=existingSignupFor(group,name);
+  if(!existing){
+    show("目前沒有找到你的報名紀錄","error");
+    return;
+  }
+
+  if(isTaskToday(group)){
+    show("工作當天無法自行取消，請聯絡正職人員","error");
+    return;
+  }
+
+  const schoolText=group.schools.map(s=>s.school).join("、");
+  if(!confirm("確定要取消 "+group.date+" "+group.displayTime+(schoolText?"｜"+schoolText:"")+" 的報名嗎？")) return;
+
+  const btn=document.getElementById("cancel_"+i);
+  btn.disabled=true;
+  btn.textContent="取消中…";
+
+  try{
+    const storedPlace=clean(existing["地點"]);
+    const fallbackPlace=group.schools.length===1 ? group.schools[0].school : "待分派";
+
+    await fetch(API,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({
+        action:"cancel",
+        date:group.date,
+        place:storedPlace||fallbackPlace,
+        location:storedPlace||fallbackPlace,
+        shiftTime:group.rawTime,
+        time:group.rawTime,
+        name:name
+      })
+    });
+
+    show("已取消報名","ok");
+    await new Promise(r=>setTimeout(r,1000));
+    await loadAll();
+  }catch(e){
+    show(e.message||"取消失敗，請再試一次","error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="取消報名";
   }
 }
 
