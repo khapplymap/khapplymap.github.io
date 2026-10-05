@@ -23,6 +23,7 @@ select,input{width:100%;height:50px;border:1px solid #d1d5db;border-radius:14px;
 select{appearance:auto;-webkit-appearance:menulist}
 .btn{width:100%;margin-top:14px;height:50px;border:0;border-radius:14px;background:#111827;color:#fff;font-size:16px;font-weight:800;cursor:pointer}
 .btn:disabled{opacity:.55;cursor:wait}
+.btn-secondary{background:#fff;color:#111827;border:1px solid #d1d5db}
 .person{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #eceff3;border-radius:12px;background:#fafafa;margin-top:7px}
 .time{font-weight:800;color:#0f766e}.empty{color:#6b7280;text-align:center;padding:12px}
 .notice{display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;border:1px solid #d1d5db;background:#fff}
@@ -46,9 +47,9 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
     <button class="refresh" onclick="loadAll()">重新整理</button>
   </div>
   <div id="content"><div class="card empty">同步資料中…</div></div>
-<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 2350</div></main>
+<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 1315</div></main>
 <script>
-const BUILD_VERSION="20261002-2350";
+const BUILD_VERSION="20261005-1315";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -415,6 +416,32 @@ function isPastGroup(group){
   return iso<today;
 }
 
+function existingSignupFor(group,name){
+  const target=clean(name);
+  if(!target) return null;
+  return groupPeople(group).find(s=>clean(s["姓名"])===target)||null;
+}
+
+function handleNameChange(i){
+  const groups=groupTasks(tasks);
+  const group=groups[i];
+  if(!group) return;
+  const nameEl=document.getElementById("name_"+i);
+  const untilEl=document.getElementById("until_"+i);
+  const btn=document.getElementById("btn_"+i);
+  if(!nameEl||!untilEl||!btn) return;
+
+  const existing=existingSignupFor(group,nameEl.value);
+  if(existing){
+    const current=normalizeTimeText(existing["可出勤到幾點"]);
+    if(current) untilEl.value=current;
+    btn.textContent="更新時間";
+  }else{
+    untilEl.value="";
+    btn.textContent="確認可以上班";
+  }
+}
+
 function renderGroupCard(g,i,isHistory){
   const people=groupPeople(g);
 
@@ -441,7 +468,7 @@ function renderGroupCard(g,i,isHistory){
     if(state.open){
       actionHtml='<hr>'+
         '<label>姓名</label>'+
-        '<select id="name_'+i+'">'+opts+'</select>'+
+        '<select id="name_'+i+'" onchange="handleNameChange('+i+')">'+opts+'</select>'+
         '<label>可出勤到幾點</label>'+
         '<select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
         '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
@@ -519,6 +546,7 @@ async function submitSignup(i){
     return;
   }
 
+  const existing=existingSignupFor(group,name);
   const btn=document.getElementById("btn_"+i);
   btn.disabled=true;
   btn.textContent="送出中…";
@@ -541,14 +569,15 @@ async function submitSignup(i){
       })
     });
 
-    show("已送出登記","ok");
+    show(existing?"已更新出勤時間":"已送出登記","ok");
     await new Promise(r=>setTimeout(r,900));
     await loadAll();
   }catch(e){
     show(e.message||"送出失敗","error");
   }finally{
     btn.disabled=false;
-    btn.textContent="確認可以上班";
+    const latest=existingSignupFor(group,name);
+    btn.textContent=latest?"更新時間":"確認可以上班";
   }
 }
 
