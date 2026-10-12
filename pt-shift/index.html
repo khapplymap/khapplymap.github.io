@@ -49,9 +49,9 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
     <button class="refresh" onclick="loadAll()">重新整理</button>
   </div>
   <div id="content"><div class="card empty">同步資料中…</div></div>
-<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 1320</div></main>
+<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261012</div></main>
 <script>
-const BUILD_VERSION="20261005-1320";
+const BUILD_VERSION="20261012-verify";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -541,7 +541,7 @@ function render(){
     html+='<div class="section-title">目前／未來排班</div><div class="card empty">目前沒有未來排班</div>';
   }
 
-  if(history.length){
+  if(false && history.length){
     html+='<div class="history-wrap"><div class="section-title">已結束排班</div>'+
       history.slice().reverse().map(x=>renderGroupCard(x.g,x.i,true)).join("")+
       '</div>';
@@ -553,51 +553,47 @@ function render(){
 async function submitSignup(i){
   const groups=groupTasks(tasks);
   const group=groups[i];
-  const name=clean(document.getElementById("name_"+i).value);
-  const until=clean(document.getElementById("until_"+i).value);
-
-  if(!name){
-    show("請先選擇姓名","error");
-    return;
-  }
-
-  if(!until){
-    show("請填寫可出勤到幾點","error");
-    return;
-  }
-
-  const existing=existingSignupFor(group,name);
+  if(!group) return;
+  const nameEl=document.getElementById("name_"+i);
+  const untilEl=document.getElementById("until_"+i);
   const btn=document.getElementById("btn_"+i);
-  btn.disabled=true;
-  btn.textContent="送出中…";
-
+  const name=clean(nameEl?.value),until=clean(untilEl?.value);
+  if(!name){show("請先選擇姓名","error");return;}
+  if(!until){show("請選擇可出勤到幾點","error");return;}
+  const existing=existingSignupFor(group,name);
+  btn.disabled=true;btn.textContent="送出中…";
   try{
-    await fetch(API,{
-      method:"POST",
-      mode:"no-cors",
+    await fetch(API,{method:"POST",mode:"no-cors",
       headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({
-        action:"signup",
-        date:group.date,
-        place:group.schools.length===1 ? group.schools[0].school : "待分派",
-        location:group.schools.length===1 ? group.schools[0].school : "待分派",
-        shiftTime:group.rawTime,
-        time:group.rawTime,
-        mode:group.mode || "一般",
-        name:name,
-        until:until
-      })
+      body:JSON.stringify({action:"signup",date:group.date,
+        place:group.schools.length===1?group.schools[0].school:"待分派",
+        location:group.schools.length===1?group.schools[0].school:"待分派",
+        shiftTime:group.rawTime,time:group.rawTime,
+        mode:group.mode||"一般",name,until})
     });
-
-    show(existing?"已更新出勤時間":"已送出登記","ok");
-    await new Promise(r=>setTimeout(r,900));
-    await loadAll();
+    let verified=false,readError=null;
+    for(let attempt=0;attempt<3;attempt++){
+      await new Promise(r=>setTimeout(r,1300+attempt*900));
+      try{
+        const rows=await readSheet("報名紀錄");
+        signups=rows.filter(r=>clean(r["姓名"]));
+        const matched=existingSignupFor(group,name);
+        if(matched && normalizeTimeText(matched["可出勤到幾點"])===normalizeTimeText(until)){
+          verified=true;break;
+        }
+      }catch(e){readError=e;}
+    }
+    if(verified){
+      render();
+      show(existing?"已確認更新成功":"已確認登記成功","ok");
+    }else{
+      show("尚未確認寫入成功，請聯絡管理者確認報名紀錄"+(readError?"（資料讀取異常）":""),"error");
+    }
   }catch(e){
-    show(e.message||"送出失敗","error");
+    show("送出發生錯誤："+(e.message||"請聯絡管理者"),"error");
   }finally{
-    btn.disabled=false;
-    const latest=existingSignupFor(group,name);
-    btn.textContent=latest?"更新時間":"確認可以上班";
+    const liveBtn=document.getElementById("btn_"+i);
+    if(liveBtn){liveBtn.disabled=false;liveBtn.textContent="確認可以上班";}
   }
 }
 
