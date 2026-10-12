@@ -569,7 +569,7 @@ async function submitSignup(i){
         place:group.schools.length===1?group.schools[0].school:"待分派",
         location:group.schools.length===1?group.schools[0].school:"待分派",
         shiftTime:group.rawTime,time:group.rawTime,
-        mode:group.mode||"一般",name,until})
+        mode:group.isAfternoon?"下午":"一般",name,until})
     });
     let verified=false,readError=null;
     for(let attempt=0;attempt<3;attempt++){
@@ -641,7 +641,8 @@ async function cancelSignup(i){
         location:storedPlace||fallbackPlace,
         shiftTime:group.rawTime,
         time:group.rawTime,
-        name:name
+        name:name,
+        mode:group.isAfternoon?"下午":"一般"
       })
     });
 
