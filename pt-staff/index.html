@@ -176,7 +176,7 @@ function buildTaskGroups(){
   const map=new Map();
   tasks.forEach(t=>{
     const date=clean(t["日期"]),time=normalizeTimeText(t["時間"]),key=date+"||"+time;
-    if(!map.has(key))map.set(key,{key,date,time,schools:[]});
+    if(!map.has(key))map.set(key,{key,date,time,rawTime:clean(t["時間"]),schools:[]});
     map.get(key).schools.push({name:clean(t["地點"]),need:Number(clean(t["人數"]))||0});
   });
   return [...map.values()]
@@ -296,7 +296,7 @@ async function saveEarlyGroup(key,publish){
  if(!confirm((publish?"【正式公布】":"儲存")+" "+g.date+" "+g.time+"，共 "+assignments.length+" 人？"+(publish?"\\n公布後將鎖定報名，請先核對分配。":"")))return;
  earlyBusy=true;el.textContent="正在送出，請稍候…";
  try{
-  await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:publish?"publishEarly":"saveEarlyPreview",date:g.date,time:g.time,assignments})});
+  await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:publish?"publishEarly":"saveEarlyPreview",date:g.date,time:g.rawTime,assignments})});
   await new Promise(r=>setTimeout(r,1800));
   const rows=objects(await csvSheet(publish?"報名紀錄":"提前人工分配"));
   const ok=assignments.every(a=>rows.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&clean(r["姓名"])===a.name&&clean(r["指派學校"])===a.school&&(!publish||clean(r["排程狀態"])==="已公布")));
