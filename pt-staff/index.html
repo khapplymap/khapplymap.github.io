@@ -65,7 +65,7 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
     <div id="previewSummary" class="summary" style="margin:0">載入中…</div>
     <button onclick="loadAll()">重新整理預覽</button>
   </div>
-  <div class="preview-actions"><button onclick="generateEarlyPreview()">提前產生建議分配</button><button onclick="publishEarly()">手動提前正式公布</button></div><div id="earlyActionStatus" class="summary" role="status">提前公布需要後端啟用；尚未啟用前不會送出正式公布指令。</div><div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
+  <div class="preview-actions"><button onclick="generateEarlyPreview()">提前產生建議分配</button><button onclick="publishEarly()">公布操作說明</button></div><div id="earlyActionStatus" class="summary" role="status">請先部署最新版 Apps Script。每個班次可分別儲存、提前公布。</div><div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
 </section>
 </main>
 
@@ -272,20 +272,39 @@ function renderPreview(){
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
-    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div><div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button></div></section>';
+    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div><div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
   }).join("");
 }
 
 async function generateEarlyPreview(){
-  const el=document.getElementById("earlyActionStatus");
-  el.textContent="正在重新讀取報名資料並產生本機建議分配…";
-  await loadAll();
-  switchTab("preview");
-  el.textContent="已更新建議分配。注意：目前手動調配尚未儲存到後端，重新整理會消失。";
+ const el=document.getElementById("earlyActionStatus");el.textContent="正在更新預覽…";
+ await loadAll();switchTab("preview");
+ el.textContent="預覽已更新。可在各班次下方儲存分配或提前正式公布。";
 }
-function publishEarly(){
-  document.getElementById("earlyActionStatus").textContent="尚未啟用：後端必須先支援提前公布及保存人工調配，避免公布錯誤名單。";
-  alert("目前尚不能安全地提前正式公布：後端的 autoPublish 仍受 18:30 時間限制，而且手動調配未儲存。請先完成 Apps Script 後端更新。");
+function publishEarly(){alert("請在對應班次下方點選「提前正式公布」。操作前請先部署最新版 Apps Script。");}
+function earlyGroupAssignments(g){
+ const r=applyOverrides(g,allocate(g,signupPeople(g)));
+ return [...r.assigned.flatMap(b=>b.people.map(p=>({name:p.name,school:b.school}))),...r.standby.map(p=>({name:p.name,school:"候補"}))];
+}
+let earlyBusy=false;
+async function saveEarlyGroup(key,publish){
+ if(earlyBusy)return;
+ const g=buildTaskGroups().find(x=>x.key===key),el=document.getElementById("earlyActionStatus");
+ if(!g){alert("找不到班次");return;}
+ const assignments=earlyGroupAssignments(g);
+ if(!assignments.length){alert("此班次沒有報名人員");return;}
+ if(!confirm((publish?"【正式公布】":"儲存")+" "+g.date+" "+g.time+"，共 "+assignments.length+" 人？"+(publish?"\\n公布後將鎖定報名，請先核對分配。":"")))return;
+ earlyBusy=true;el.textContent="正在送出，請稍候…";
+ try{
+  await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:publish?"publishEarly":"saveEarlyPreview",date:g.date,time:g.time,assignments})});
+  await new Promise(r=>setTimeout(r,1800));
+  const rows=objects(await csvSheet(publish?"報名紀錄":"提前人工分配"));
+  const ok=assignments.every(a=>rows.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&clean(r["姓名"])===a.name&&clean(r["指派學校"])===a.school&&(!publish||clean(r["排程狀態"])==="已公布")));
+  if(!ok)throw Error("尚未從試算表確認寫入成功。請檢查 Apps Script 部署與試算表；不要直接重複公布。");
+  el.textContent=g.date+" "+g.time+(publish?" 已確認正式公布":" 已確認儲存成功");
+  await loadAll();
+ }catch(e){el.textContent="操作未確認："+e.message;alert(el.textContent);}
+ finally{earlyBusy=false;}
 }
 function switchTab(tab){
   const a=tab==="attendance";
