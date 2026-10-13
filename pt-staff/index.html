@@ -65,7 +65,7 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
     <div id="previewSummary" class="summary" style="margin:0">載入中…</div>
     <button onclick="loadAll()">重新整理預覽</button>
   </div>
-  <div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
+  <div class="preview-actions"><button onclick="generateEarlyPreview()">提前產生建議分配</button><button onclick="publishEarly()">手動提前正式公布</button></div><div id="earlyActionStatus" class="summary" role="status">提前公布需要後端啟用；尚未啟用前不會送出正式公布指令。</div><div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
 </section>
 </main>
 
@@ -276,6 +276,17 @@ function renderPreview(){
   }).join("");
 }
 
+async function generateEarlyPreview(){
+  const el=document.getElementById("earlyActionStatus");
+  el.textContent="正在重新讀取報名資料並產生本機建議分配…";
+  await loadAll();
+  switchTab("preview");
+  el.textContent="已更新建議分配。注意：目前手動調配尚未儲存到後端，重新整理會消失。";
+}
+function publishEarly(){
+  document.getElementById("earlyActionStatus").textContent="尚未啟用：後端必須先支援提前公布及保存人工調配，避免公布錯誤名單。";
+  alert("目前尚不能安全地提前正式公布：後端的 autoPublish 仍受 18:30 時間限制，而且手動調配未儲存。請先完成 Apps Script 後端更新。");
+}
 function switchTab(tab){
   const a=tab==="attendance";
   document.getElementById("attendancePanel").className=a?"":"hidden";
