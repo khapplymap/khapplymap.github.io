@@ -51,7 +51,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
   <div id="content"><div class="card empty">同步資料中…</div></div>
 <div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261012</div></main>
 <script>
-const BUILD_VERSION="20261012-modefix";
+const BUILD_VERSION="20261014-1830-roster";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -225,22 +225,17 @@ function isTaskToday(group){
 }
 
 function signupState(group){
-  const iso=taskIsoDate(group.date);
-  const now=taipeiNowParts();
-  const today=now.year+"-"+now.month+"-"+now.day;
-  const mins=Number(now.hour)*60+Number(now.minute);
-
-  if(group.isAfternoon){
-    if(iso!==today) return {open:false,reason:"當天 11:30 開放登記"};
-    if(mins<11*60+30) return {open:false,reason:"當天 11:30 開放登記"};
-    return {open:true,reason:""};
-  }
-
-  if(iso===today && mins>=10*60){
-    return {open:false,reason:"上午班已截止登記"};
-  }
-
+ const now=taipeiNowParts();
+ const today=now.year+"-"+now.month+"-"+now.day;
+ const mins=Number(now.hour)*60+Number(now.minute);
+ const iso=taskIsoDate(group.date);
+ if(group.isAfternoon){
+  if(iso!==today||mins<690)return {open:false,reason:"當天 11:30 開放登記"};
   return {open:true,reason:""};
+ }
+ const deadline=Date.parse(iso+"T18:00:00+08:00")-86400000;
+ if(Date.now()>=deadline)return {open:false,reason:"工作前一天 18:00 已截止報名；18:30 公布正式分配名單"};
+ return {open:true,reason:""};
 }
 
 function parseCsv(text){
@@ -553,9 +548,9 @@ function render(){
     html+='<div class="section-title">目前／未來排班</div><div class="card empty">目前沒有未來排班</div>';
   }
 
-  if(false && history.length){
+  if(history.length){
     html+='<div class="history-wrap"><div class="section-title">已結束排班</div>'+
-      history.slice().reverse().map(x=>renderGroupCard(x.g,x.i,true)).join("")+
+      history.slice().reverse().filter(x=>groupPeople(x.g).some(p=>clean(p["排程狀態"])==="已公布")).slice(0,8).map(x=>renderGroupCard(x.g,x.i,true)).join("")+
       '</div>';
   }
 
@@ -626,8 +621,8 @@ async function cancelSignup(i){
     return;
   }
 
-  if(isTaskToday(group)){
-    show("工作當天無法自行取消，請聯絡正職人員","error");
+  if(!signupState(group).open){
+    show("報名已截止，請聯絡 Jimmy 或是人資","error");
     return;
   }
 
