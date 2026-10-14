@@ -136,6 +136,30 @@ function displayScheduleStatus(r){
   return displaySchool(r)!=="待分派" ? "已分派" : "待分派";
 }
 
+function isPastScheduleDate(v){
+ const m=clean(v).match(/^(\d{1,2})\/(\d{1,2})$/);
+ if(!m)return false;
+ const now=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const parts={};now.forEach(p=>parts[p.type]=p.value);
+ const today=Number(parts.month)*100+Number(parts.day);
+ return Number(m[1])*100+Number(m[2])<today;
+}
+function collapsedDateGroups(items,makeHtml,getDate){
+ const upcoming=[],old=new Map();
+ items.forEach(item=>{
+  const date=getDate(item);
+  if(isPastScheduleDate(date)){
+   if(!old.has(date))old.set(date,[]);
+   old.get(date).push(item);
+  }else upcoming.push(item);
+ });
+ const live=upcoming.map(makeHtml).join("");
+ const history=[...old.entries()].sort((a,b)=>dateOrder(b[0])-dateOrder(a[0])).map(([date,rows])=>
+  '<details class="card" style="padding:0;overflow:hidden"><summary style="cursor:pointer;padding:17px 18px;font-weight:800">'+esc(date)+'｜已過期（'+rows.length+' 個班次／學校）｜點擊展開</summary>'+
+  '<div style="padding:0 14px 12px">'+rows.map(makeHtml).join("")+'</div></details>'
+ ).join("");
+ return live+(old.size?'<div class="summary" style="margin:18px 0 10px;font-weight:800">歷史排程（已自動收合）</div>'+history:'');
+}
 function renderAttendance(){
   const df=clean(document.getElementById("dateFilter").value).toLowerCase();
   const pf=clean(document.getElementById("placeFilter").value).toLowerCase();
@@ -157,7 +181,7 @@ function renderAttendance(){
   const keys=Object.keys(groups);
   if(!keys.length){document.getElementById("attendanceList").innerHTML='<div class="card empty">沒有符合條件的資料</div>';return}
 
-  document.getElementById("attendanceList").innerHTML=keys.map(k=>{
+  document.getElementById("attendanceList").innerHTML=collapsedDateGroups(keys,k=>{
     const g=groups[k],f=g[0],school=displaySchool(f);
     return '<section class="card"><div class="head"><div><div class="place">'+esc(school)+'</div><div class="date">'+esc(f["日期"])+' '+esc(f["班次時間"])+'</div>'+
       (clean(f["排程類型"])?'<span class="badge">'+esc(f["排程類型"])+'</span>':'')+
@@ -165,7 +189,7 @@ function renderAttendance(){
       '<table><thead><tr><th>姓名</th><th>可出勤到</th><th>排程狀態</th><th>填寫時間</th><th>取消時間</th></tr></thead><tbody>'+
       g.map(r=>'<tr><td>'+esc(r["姓名"])+'</td><td>'+esc(r["可出勤到幾點"])+'</td><td>'+esc(displayScheduleStatus(r))+'</td><td>'+esc(r["填寫時間"])+'</td><td>'+esc(r["取消時間"])+'</td></tr>').join("")+
       '</tbody></table></section>';
-  }).join("");
+  },k=>groups[k][0]["日期"]);
 }
 
 function normalizeTimeText(v){const m=clean(v).match(/(\d{1,2})\s*:\s*(\d{2})/);return m?String(Number(m[1])).padStart(2,"0")+":"+m[2]:clean(v)}
@@ -264,7 +288,7 @@ function renderPreview(){
     return;
   }
   document.getElementById("previewSummary").textContent="共 "+groups.length+" 個班次";
-  document.getElementById("previewList").innerHTML=groups.map(g=>{
+  document.getElementById("previewList").innerHTML=collapsedDateGroups(groups,g=>{
     const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
     const schools=result.assigned.map(b=>{
@@ -273,7 +297,7 @@ function renderPreview(){
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
     return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div><div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
-  }).join("");
+  },g=>g.date);
 }
 
 async function generateEarlyPreview(){
