@@ -352,6 +352,32 @@ function personPreviewHtml(group,p,current){
   const mc=p.move==="可"?"ok":p.move==="注意"?"warn":"";
   return '<div class="preview-person"><div style="font-size:13px;color:#475569;font-weight:750;margin-bottom:7px">報名第 '+p.signupRank+' 位｜'+esc(p.signupAt||"未記錄報名時間")+'</div><div class="preview-person-main"><div class="preview-name">'+esc(p.name)+'</div><div>'+esc(p.sex)+'</div><div class="preview-until">'+esc(p.until||"-")+'</div><div class="preview-move '+mc+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div><div class="manual-row"><span>手動調配：</span>'+buttons+'</div></div>';
 }
+function shiftSafetyWarnings(g,people,result){
+ const warnings=[],need=result.totalNeed;
+ if(people.length>need)warnings.push("報名 "+people.length+" 人，需求 "+need+" 人，超額 "+(people.length-need)+" 人；請確認候補名單。");
+ if(people.length<need)warnings.push("人力尚缺 "+(need-people.length)+" 人（僅提醒，不影響正常公布）。");
+ if(result.pending.length)warnings.push("尚有 "+result.pending.length+" 人待分配，請核對或使用自動分配。");
+ const boxes=result.assigned.filter(b=>b.people.length);
+ if(boxes.length>1){
+  const score=xs=>{
+   const total=xs.reduce((n,b)=>n+b.people.length,0);
+   const men=xs.reduce((n,b)=>n+b.people.filter(p=>p.sex==="男").length,0);
+   if(!total)return 0;
+   return xs.reduce((n,b)=>n+Math.abs(b.people.filter(p=>p.sex==="男").length-b.people.length*men/total),0);
+  };
+  const base=score(boxes);let improvable=false;
+  for(let i=0;i<boxes.length&&!improvable;i++)for(let j=i+1;j<boxes.length&&!improvable;j++){
+   const a=boxes[i],b=boxes[j];
+   for(const x of a.people)for(const y of b.people){
+    if(x.sex===y.sex||!["男","女"].includes(x.sex)||!["男","女"].includes(y.sex))continue;
+    const swapped=boxes.map((z,k)=>k===i?{people:a.people.map(p=>p===x?y:p)}:k===j?{people:b.people.map(p=>p===y?x:p)}:z);
+    if(score(swapped)<base-0.01){improvable=true;break;}
+   }
+  }
+  if(improvable)warnings.push("目前男女配置可以透過跨校交換變得更平均；建議手動檢查。");
+ }
+ return warnings;
+}
 function renderPreview(){
   const groups=buildTaskGroups();
   if(!groups.length){
@@ -362,6 +388,8 @@ function renderPreview(){
   document.getElementById("previewSummary").textContent="共 "+groups.length+" 個班次";
   document.getElementById("previewList").innerHTML=collapsedDateGroups(groups,g=>{
     const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
+    const safetyWarnings=shiftSafetyWarnings(g,people,result);
+    const safetyHtml=safetyWarnings.length?'<div style="padding:14px;border:1px solid #efc58e;background:#fff6e9;border-radius:12px;margin:12px 0"><strong>18:00 公布前檢查｜請留意</strong><ul style="margin:8px 0 0;padding-left:20px">'+safetyWarnings.map(w=>'<li style="margin:5px 0">'+esc(w)+'</li>').join("")+'</ul><div style="margin-top:9px;font-size:12px;color:#7c4a1b">這裡是管理網站的提醒；目前尚未連動後端暫停 18:30 公布。</div></div>':'<div style="padding:11px;background:#eefbf3;border:1px solid #b7e2c9;border-radius:10px;margin:12px 0">公布前檢查：目前未發現超額、缺額、待分配或可改善的男女比例問題。</div>';
     const mode=allocationModes[g.key]||"balanced";
     const pendingHtml='<div class="preview-school" style="background:#eff6ff;margin:14px 0"><div class="preview-school-title"><span>待分配區</span><span>'+result.pending.length+' 人</span></div><div class="preview-ratio">依照報名先後排序｜點選學校名稱或候補即可分配</div>'+ (result.pending.length?result.pending.map(p=>personPreviewHtml(g,p,"")).join(""):'<div style="padding:12px 0;color:#64748b">目前無待分配人員</div>')+'</div>';
     const modeButtons='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0"><strong>分配操作：</strong><button style="height:38px;background:#111827;color:white" onclick="shuffleAll(\''+g.key+'\',\'balanced\')">重新隨機分配全部</button><button style="height:38px" onclick="shuffleAll(\''+g.key+'\',\'first\')">全部依報名順序分配</button><button style="height:38px" onclick="autoFill(\''+g.key+'\',\'balanced\')">只補齊待分配</button><button style="height:38px" onclick="clearGroup(\''+g.key+'\')">全部移回待分配</button></div>';
@@ -372,7 +400,7 @@ function renderPreview(){
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
-    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(result.pending.length?result.pending.length+' 人待分配':'分配完成')+'</div></div>'+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
+    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(result.pending.length?result.pending.length+' 人待分配':'分配完成')+'</div></div>'+safetyHtml+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
   },g=>g.date);
 }
 
