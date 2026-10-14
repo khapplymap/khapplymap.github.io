@@ -49,9 +49,9 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
     <button class="refresh" onclick="loadAll()">重新整理</button>
   </div>
   <div id="content"><div class="card empty">同步資料中…</div></div>
-<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261015-no-standby-v2</div></main>
+<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261015-hide-standby-final</div></main>
 <script>
-const BUILD_VERSION="20261015-no-standby-v2";
+const BUILD_VERSION="20261015-hide-standby-final";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 let workers=[],tasks=[],signups=[];
@@ -398,11 +398,9 @@ function assignmentHtml(group,people){
       '</div>';
   }).join("");
 
-  const standby=""; // 工讀生網站不顯示候補預覽
-
   return '<hr><div style="font-weight:900;font-size:19px;margin-bottom:4px">隨機指派結果</div>'+
     '<div style="color:#6b7280;font-size:13px;margin-bottom:6px">依目前報名名單自動產生</div>'+
-    blocks+standby;
+    blocks;
 }
 
 function isPastGroup(group){
