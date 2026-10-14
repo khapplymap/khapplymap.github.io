@@ -296,12 +296,12 @@ function autoFill(groupKey,mode){
 }
 function clearGroup(groupKey){const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;manualOverrides[groupKey]={};signupPeople(g).forEach(p=>manualOverrides[groupKey][p.name]="");renderPreview()}
 function setManual(groupKey,name,place){if(!manualOverrides[groupKey])manualOverrides[groupKey]={};manualOverrides[groupKey][name]=place;renderPreview()}
-function setAllocationMode(groupKey,mode){allocationModes[groupKey]=mode;manualOverrides[groupKey]={};renderPreview()}
+function setAllocationMode(groupKey,mode){allocationModes[groupKey]=mode;autoFill(groupKey,mode)}
 function reroll(groupKey){rerollNonce[groupKey]=(rerollNonce[groupKey]||0)+1;manualOverrides[groupKey]={};renderPreview()}
 function resetManual(groupKey){manualOverrides[groupKey]={};renderPreview()}
 function personPreviewHtml(group,p,current){
-  const places=[...group.schools.map(s=>s.name),"候補"];
-  const buttons=places.map(place=>'<button class="movebtn '+(place===current?'active':'')+'" onclick="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',\''+place.replace(/'/g,"\\'")+'\')">'+esc(place)+'</button>').join("");
+  const places=[...group.schools.map(s=>s.name),"候補","待分配"];
+  const buttons=places.map(place=>'<button class="movebtn '+((place==="待分配"&&!current)||place===current?'active':'')+'" onclick="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',\''+(place==="待分配"?"":place).replace(/'/g,"\\'")+'\')">'+esc(place)+'</button>').join("");
   const mc=p.move==="可"?"ok":p.move==="注意"?"warn":"";
   return '<div class="preview-person"><div style="font-size:13px;color:#475569;font-weight:750;margin-bottom:7px">報名第 '+p.signupRank+' 位｜'+esc(p.signupAt||"未記錄報名時間")+'</div><div class="preview-person-main"><div class="preview-name">'+esc(p.name)+'</div><div>'+esc(p.sex)+'</div><div class="preview-until">'+esc(p.until||"-")+'</div><div class="preview-move '+mc+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div><div class="manual-row"><span>手動調配：</span>'+buttons+'</div></div>';
 }
@@ -316,6 +316,7 @@ function renderPreview(){
   document.getElementById("previewList").innerHTML=collapsedDateGroups(groups,g=>{
     const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
     const mode=allocationModes[g.key]||"balanced";
+    const pendingHtml='<div class="preview-school" style="background:#eff6ff;margin:14px 0"><div class="preview-school-title"><span>待分配區</span><span>'+result.pending.length+' 人</span></div><div class="preview-ratio">依照報名先後排序｜點選學校名稱或候補即可分配</div>'+ (result.pending.length?result.pending.map(p=>personPreviewHtml(g,p,"")).join(""):'<div style="padding:12px 0;color:#64748b">目前無待分配人員</div>')+'</div>';
     const modeButtons='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0"><strong>分配方式：</strong><button style="height:38px;'+(mode==="balanced"?'background:#111827;color:#fff;':'')+'" onclick="setAllocationMode(\''+g.key+'\',\'balanced\')">男女／搬運平均</button><button style="height:38px;'+(mode==="first"?'background:#111827;color:#fff;':'')+'" onclick="setAllocationMode(\''+g.key+'\',\'first\')">依報名先後</button></div>';
     const orderList='<details style="margin:10px 0 14px"><summary style="cursor:pointer;font-weight:750">查看完整報名順序（'+people.length+' 人）</summary><div style="padding:10px 0">'+people.map(p=>'<div style="padding:6px 0;border-bottom:1px solid #e5e7eb">'+p.signupRank+'. '+esc(p.name)+'　'+esc(p.signupAt||'時間未記錄')+'</div>').join('')+'</div></details>';
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
@@ -324,7 +325,7 @@ function renderPreview(){
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
-    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions">'+(mode==="balanced"?'<button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button>':'')+'<button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
+    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions">'+(mode==="balanced"?'<button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button>':'')+'<button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
   },g=>g.date);
 }
 
@@ -336,6 +337,7 @@ async function generateEarlyPreview(){
 function publishEarly(){alert("請在對應班次下方點選「提前正式公布」。操作前請先部署最新版 Apps Script。");}
 function earlyGroupAssignments(g){
  const r=applyOverrides(g,allocate(g,signupPeople(g)));
+ if(r.pending.length)return null;
  return [...r.assigned.flatMap(b=>b.people.map(p=>({name:p.name,school:b.school}))),...r.standby.map(p=>({name:p.name,school:"候補"}))];
 }
 let earlyBusy=false;
@@ -344,6 +346,7 @@ async function saveEarlyGroup(key,publish){
  const g=buildTaskGroups().find(x=>x.key===key),el=document.getElementById("earlyActionStatus");
  if(!g){alert("找不到班次");return;}
  const assignments=earlyGroupAssignments(g);
+ if(!assignments){alert("尚有人在待分配區，請先點選學校或候補，也可使用自動分配功能。");return;}
  if(!assignments.length){alert("此班次沒有報名人員");return;}
  if(!confirm((publish?"【正式公布】":"儲存")+" "+g.date+" "+g.time+"，共 "+assignments.length+" 人？"+(publish?"\\n公布後將鎖定報名，請先核對分配。":"")))return;
  earlyBusy=true;
