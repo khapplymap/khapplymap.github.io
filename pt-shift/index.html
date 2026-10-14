@@ -398,13 +398,7 @@ function assignmentHtml(group,people){
       '</div>';
   }).join("");
 
-  const standby=result.standby.length
-    ? '<div style="margin-top:16px"><div style="font-weight:900;font-size:17px;margin-bottom:6px">候補</div>'+
-      result.standby.map(p=>
-        '<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>'
-      ).join("")+
-      '</div>'
-    : "";
+  const standby=""; // 工讀生網站不顯示候補預覽
 
   return '<hr><div style="font-weight:900;font-size:19px;margin-bottom:4px">隨機指派結果</div>'+
     '<div style="color:#6b7280;font-size:13px;margin-bottom:6px">依目前報名名單自動產生</div>'+
@@ -460,7 +454,7 @@ function officialRoster(people){
  const done=people.filter(p=>clean(p["排程狀態"])==="已公布");
  if(!done.length)return "";
  const schools={};
- done.forEach(p=>{const k=clean(p["指派學校"])||"候補";(schools[k]||(schools[k]=[])).push(p);});
+ done.forEach(p=>{const k=clean(p["指派學校"]);if(!k||k==="候補")return;(schools[k]||(schools[k]=[])).push(p);});
  return '<hr><h3>正式分配名單</h3>'+
  Object.keys(schools).map(k=>'<div class="school-item"><strong>'+esc(k)+'｜'+schools[k].length+' 人</strong></div>'+
  schools[k].map(p=>'<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>').join("")).join("")+
