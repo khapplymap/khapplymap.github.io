@@ -72,7 +72,7 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={};
+let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={},allocationModes={};
 
 function clean(v){return String(v==null?"":v).trim()}
 function esc(v){return clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
@@ -218,9 +218,10 @@ function signupPeople(group){
     const name=clean(s["姓名"]);if(!name)return;
     latest.set(name,s);
   });
-  return [...latest.values()].map(s=>{
+  const ordered=[...latest.values()].sort((a,b)=>clean(a["填寫時間"]).localeCompare(clean(b["填寫時間"]))||clean(a["姓名"]).localeCompare(clean(b["姓名"])));
+  return ordered.map((s,i)=>{
     const w=wmap.get(clean(s["姓名"]))||{};
-    return {name:clean(s["姓名"]),sex:clean(w["性別"])||"未填",move:clean(w["可搬運"])||"",until:clean(s["可出勤到幾點"])||""};
+    return {name:clean(s["姓名"]),sex:clean(w["性別"])||"未填",move:clean(w["可搬運"])||"",until:clean(s["可出勤到幾點"])||"",signupAt:clean(s["填寫時間"]),signupRank:i+1};
   });
 }
 function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
@@ -228,6 +229,12 @@ function seededRandom(seed){let x=seed>>>0;return()=>{x+=0x6D2B79F5;let t=x;t=Ma
 function shuffleStable(arr,seed){const a=arr.slice(),r=seededRandom(hashString(seed));for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function allocate(group,people){
   const totalNeed=group.schools.reduce((s,x)=>s+x.need,0);
+  if(allocationModes[group.key]==="first"){
+    const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]}));
+    let i=0;
+    assigned.forEach(box=>{while(box.people.length<box.need&&i<people.length)box.people.push(people[i++]);});
+    return {assigned,standby:people.slice(i),totalNeed};
+  }
   const nonce=rerollNonce[group.key]||0;
   const seed=group.key+"|"+nonce+"|"+people.map(p=>p.name+":"+p.until).sort().join("|");
   let men=shuffleStable(people.filter(p=>p.sex==="男"),seed+"m");
@@ -272,13 +279,14 @@ function applyOverrides(group,result){
   return {assigned,standby,totalNeed:result.totalNeed};
 }
 function setManual(groupKey,name,place){if(!manualOverrides[groupKey])manualOverrides[groupKey]={};manualOverrides[groupKey][name]=place;renderPreview()}
+function setAllocationMode(groupKey,mode){allocationModes[groupKey]=mode;manualOverrides[groupKey]={};renderPreview()}
 function reroll(groupKey){rerollNonce[groupKey]=(rerollNonce[groupKey]||0)+1;manualOverrides[groupKey]={};renderPreview()}
 function resetManual(groupKey){manualOverrides[groupKey]={};renderPreview()}
 function personPreviewHtml(group,p,current){
   const places=[...group.schools.map(s=>s.name),"候補"];
   const buttons=places.map(place=>'<button class="movebtn '+(place===current?'active':'')+'" onclick="setManual(\''+group.key.replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\',\''+place.replace(/'/g,"\\'")+'\')">'+esc(place)+'</button>').join("");
   const mc=p.move==="可"?"ok":p.move==="注意"?"warn":"";
-  return '<div class="preview-person"><div class="preview-person-main"><div class="preview-name">'+esc(p.name)+'</div><div>'+esc(p.sex)+'</div><div class="preview-until">'+esc(p.until||"-")+'</div><div class="preview-move '+mc+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div><div class="manual-row"><span>手動調配：</span>'+buttons+'</div></div>';
+  return '<div class="preview-person"><div style="font-size:13px;color:#475569;font-weight:750;margin-bottom:7px">報名第 '+p.signupRank+' 位｜'+esc(p.signupAt||"未記錄報名時間")+'</div><div class="preview-person-main"><div class="preview-name">'+esc(p.name)+'</div><div>'+esc(p.sex)+'</div><div class="preview-until">'+esc(p.until||"-")+'</div><div class="preview-move '+mc+'">'+esc(p.move?("搬運："+p.move):"")+'</div></div><div class="manual-row"><span>手動調配：</span>'+buttons+'</div></div>';
 }
 function renderPreview(){
   const groups=buildTaskGroups();
@@ -290,13 +298,16 @@ function renderPreview(){
   document.getElementById("previewSummary").textContent="共 "+groups.length+" 個班次";
   document.getElementById("previewList").innerHTML=collapsedDateGroups(groups,g=>{
     const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
+    const mode=allocationModes[g.key]||"balanced";
+    const modeButtons='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0"><strong>分配方式：</strong><button style="height:38px;'+(mode==="balanced"?'background:#111827;color:#fff;':'')+'" onclick="setAllocationMode(\''+g.key+'\',\'balanced\')">男女／搬運平均</button><button style="height:38px;'+(mode==="first"?'background:#111827;color:#fff;':'')+'" onclick="setAllocationMode(\''+g.key+'\',\'first\')">依報名先後</button></div>';
+    const orderList='<details style="margin:10px 0 14px"><summary style="cursor:pointer;font-weight:750">查看完整報名順序（'+people.length+' 人）</summary><div style="padding:10px 0">'+people.map(p=>'<div style="padding:6px 0;border-bottom:1px solid #e5e7eb">'+p.signupRank+'. '+esc(p.name)+'　'+esc(p.signupAt||'時間未記錄')+'</div>').join('')+'</div></details>';
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
     const schools=result.assigned.map(b=>{
       const m=b.people.filter(p=>p.sex==="男").length,f=b.people.filter(p=>p.sex==="女").length,mv=b.people.filter(p=>p.move==="可").length;
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
-    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div><div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
+    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(people.length>=result.totalNeed?'可排滿':'缺 '+(result.totalNeed-people.length)+' 人')+'</div></div>'+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="reroll(\''+g.key.replace(/'/g,"\\'")+'\')">重新隨機</button><button onclick="resetManual(\''+g.key.replace(/'/g,"\\'")+'\')">清除手動調配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
   },g=>g.date);
 }
 
