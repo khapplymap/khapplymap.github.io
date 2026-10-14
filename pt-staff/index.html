@@ -60,12 +60,12 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
 </section>
 
 <section id="previewPanel" class="hidden">
-  <div class="preview-note">系統會依報名名單先做男女平均分配，並盡量平均分散可搬運人員；你可以再手動把任何人調到指定學校或候補。</div>
+  <div class="preview-note">報名後先進入待分配區，依報名時間排序。可點選學校或候補，也可使用自動補齊。所有人分配完畢後，請按「儲存建議分配」，18:30 自動公布將優先採用已儲存的配置。</div>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
     <div id="previewSummary" class="summary" style="margin:0">載入中…</div>
     <button onclick="loadAll()">重新整理預覽</button>
   </div>
-  <div class="preview-actions"><button onclick="generateEarlyPreview()">提前產生建議分配</button><button onclick="publishEarly()">公布操作說明</button></div><div id="earlyActionStatus" class="summary" role="status">請先部署最新版 Apps Script。每個班次可分別儲存、提前公布。</div><div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
+  <div class="preview-actions"><button onclick="generateEarlyPreview()">提前產生建議分配</button><button onclick="publishEarly()">公布操作說明</button></div><div id="earlyActionStatus" class="summary" role="status">請先完成所有人員分配並儲存。未儲存的手動調整不會同步至 18:30 自動公布。</div><div id="previewList"><div class="card empty">目前沒有排程預覽</div></div>
 </section>
 </main>
 
