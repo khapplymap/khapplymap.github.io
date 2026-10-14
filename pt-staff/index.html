@@ -305,9 +305,6 @@ let manageBusy=false;
 async function manageShift(key,action){
  if(manageBusy)return;
  const g=buildTaskGroups().find(x=>x.key===key);if(!g)return alert("找不到班次");
- let adminKey=sessionStorage.getItem("pt_shift_admin_key")||"";
- if(!adminKey){adminKey=prompt("請輸入管理密鑰")||"";if(adminKey)sessionStorage.setItem("pt_shift_admin_key",adminKey);}
- if(!adminKey)return;
  let deadline="",assignments;
  if(action==="reopenShift"){
   deadline=prompt("請輸入新截止時間（台灣時間 YYYY-MM-DD HH:mm）","")||"";
@@ -321,7 +318,7 @@ async function manageShift(key,action){
  }
  manageBusy=true;const el=document.getElementById("earlyActionStatus");el.textContent="送出操作，等待資料核對…";
  try{
-  const payload={action,date:g.date,time:g.rawTime,adminKey,deadline};
+  const payload={action,date:g.date,time:g.rawTime,deadline};
   if(assignments)payload.assignments=assignments;
   await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
   let passed=false;
