@@ -288,10 +288,39 @@ function autoFill(groupKey,mode){
  const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;
  const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
  const pending=result.pending;
+ if(!pending.length){alert("目前沒有待分配人員。若要全部重新分配，請按「重新隨機分配全部」。");return;}
  if(!manualOverrides[groupKey])manualOverrides[groupKey]={};
  const counts={};result.assigned.forEach(b=>counts[b.school]=b.people.length);
- const order=mode==="first"?pending:allocate(g,pending).assigned.flatMap(b=>b.people).concat(allocate(g,pending).standby);
- order.forEach(p=>{const sch=g.schools.find(v=>counts[v.name]<v.need);manualOverrides[groupKey][p.name]=sch?sch.name:"候補";if(sch)counts[sch.name]++;});
+ let order;
+ if(mode==="first")order=pending.slice();
+ else{
+  const mixed=shuffleStable(pending,groupKey+"|fill|"+(rerollNonce[groupKey]||0));
+  order=mixed.slice().sort((a,b)=>(b.move==="可")-(a.move==="可"));
+ }
+ order.forEach(p=>{
+  const available=g.schools.filter(v=>counts[v.name]<v.need);
+  const sch=available.sort((a,b)=>{
+   const aa=result.assigned.find(x=>x.school===a.name),bb=result.assigned.find(x=>x.school===b.name);
+   const ap=aa.people.concat(order.filter(x=>manualOverrides[groupKey][x.name]===a.name));
+   const bp=bb.people.concat(order.filter(x=>manualOverrides[groupKey][x.name]===b.name));
+   const aSame=ap.filter(x=>x.sex===p.sex).length,bSame=bp.filter(x=>x.sex===p.sex).length;
+   return (aSame-bSame)||((counts[a.name]/a.need)-(counts[b.name]/b.need));
+  })[0];
+  manualOverrides[groupKey][p.name]=sch?sch.name:"候補";
+  if(sch)counts[sch.name]++;
+ });
+ renderPreview();
+}
+function shuffleAll(groupKey,mode){
+ const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;
+ const people=signupPeople(g);if(!people.length)return;
+ if(!confirm("確定重新分配全部 "+people.length+" 人？這會取代目前畫面上的安排（包含先前已儲存的分配），但不會立即改動試算表。完成後請按「儲存建議分配」。"))return;
+ rerollNonce[groupKey]=(rerollNonce[groupKey]||0)+1;
+ allocationModes[groupKey]=mode||"balanced";
+ const result=allocate(g,people),overrides={};
+ result.assigned.forEach(b=>b.people.forEach(p=>overrides[p.name]=b.school));
+ result.standby.forEach(p=>overrides[p.name]="候補");
+ manualOverrides[groupKey]=overrides;
  renderPreview();
 }
 function clearGroup(groupKey){const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;manualOverrides[groupKey]={};signupPeople(g).forEach(p=>manualOverrides[groupKey][p.name]="");renderPreview()}
@@ -317,7 +346,7 @@ function renderPreview(){
     const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
     const mode=allocationModes[g.key]||"balanced";
     const pendingHtml='<div class="preview-school" style="background:#eff6ff;margin:14px 0"><div class="preview-school-title"><span>待分配區</span><span>'+result.pending.length+' 人</span></div><div class="preview-ratio">依照報名先後排序｜點選學校名稱或候補即可分配</div>'+ (result.pending.length?result.pending.map(p=>personPreviewHtml(g,p,"")).join(""):'<div style="padding:12px 0;color:#64748b">目前無待分配人員</div>')+'</div>';
-    const modeButtons='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0"><strong>自動補齊尚未分配：</strong><button style="height:38px" onclick="autoFill(\''+g.key+'\',\'balanced\')">男女／搬運平均</button><button style="height:38px" onclick="autoFill(\''+g.key+'\',\'first\')">依報名先後</button><button style="height:38px" onclick="clearGroup(\''+g.key+'\')">全部移回待分配</button></div>';
+    const modeButtons='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0"><strong>分配操作：</strong><button style="height:38px;background:#111827;color:white" onclick="shuffleAll(\''+g.key+'\',\'balanced\')">重新隨機分配全部</button><button style="height:38px" onclick="shuffleAll(\''+g.key+'\',\'first\')">全部依報名順序分配</button><button style="height:38px" onclick="autoFill(\''+g.key+'\',\'balanced\')">只補齊待分配</button><button style="height:38px" onclick="clearGroup(\''+g.key+'\')">全部移回待分配</button></div>';
     const orderList='<details style="margin:10px 0 14px"><summary style="cursor:pointer;font-weight:750">查看完整報名順序（'+people.length+' 人）</summary><div style="padding:10px 0">'+people.map(p=>'<div style="padding:6px 0;border-bottom:1px solid #e5e7eb">'+p.signupRank+'. '+esc(p.name)+'　'+esc(p.signupAt||'時間未記錄')+'</div>').join('')+'</div></details>';
     const totalM=people.filter(p=>p.sex==="男").length,totalF=people.filter(p=>p.sex==="女").length;
     const schools=result.assigned.map(b=>{
