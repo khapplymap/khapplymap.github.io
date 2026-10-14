@@ -318,18 +318,42 @@ async function saveEarlyGroup(key,publish){
  const assignments=earlyGroupAssignments(g);
  if(!assignments.length){alert("此班次沒有報名人員");return;}
  if(!confirm((publish?"【正式公布】":"儲存")+" "+g.date+" "+g.time+"，共 "+assignments.length+" 人？"+(publish?"\\n公布後將鎖定報名，請先核對分配。":"")))return;
- earlyBusy=true;el.textContent="正在送出，請稍候…";
+ earlyBusy=true;
+ el.textContent="正在送出，等待試算表確認…";
  try{
   await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:publish?"publishEarly":"saveEarlyPreview",date:g.date,time:g.rawTime,assignments})});
-  await new Promise(r=>setTimeout(r,1800));
-  const rows=objects(await csvSheet(publish?"報名紀錄":"提前人工分配"));
-  const ok=assignments.every(a=>rows.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&clean(r["姓名"])===a.name&&clean(r["指派學校"])===a.school&&(!publish||clean(r["排程狀態"])==="已公布")));
-  if(!ok)throw Error("尚未從試算表確認寫入成功。請檢查 Apps Script 部署與試算表；不要直接重複公布。");
-  el.textContent=g.date+" "+g.time+(publish?" 已確認正式公布":" 已確認儲存成功");
-  await loadAll();
- }catch(e){el.textContent="操作未確認："+e.message;alert(el.textContent);}
- finally{earlyBusy=false;}
+  let verified=false;
+  let lastError="";
+  const sheet=publish?"報名紀錄":"提前人工分配";
+  for(let attempt=0;attempt<7;attempt++){
+   await new Promise(resolve=>setTimeout(resolve,1300+attempt*500));
+   el.textContent="已送出，正在核對試算表（"+(attempt+1)+"/7）…";
+   try{
+    const rows=objects(await csvSheet(sheet));
+    verified=assignments.every(a=>rows.some(r=>
+     clean(r["日期"])===g.date &&
+     normalizeTimeText(r["班次時間"])===g.time &&
+     clean(r["姓名"])===a.name &&
+     clean(r["指派學校"])===a.school &&
+     (!publish||clean(r["排程狀態"])==="已公布")
+    ));
+    if(verified)break;
+   }catch(e){lastError=e.message||"讀取異常";}
+  }
+  if(verified){
+   el.textContent=g.date+" "+g.time+(publish?" 已確認正式公布":" 已確認儲存成功");
+   await loadAll();
+  }else{
+   const msg=g.date+" "+g.time+" 指令已送出，但目前無法從公開試算表確認結果。請先查看「"+sheet+"」分頁，不要重複送出。"+(lastError?"（"+lastError+"）":"");
+   el.textContent=msg;
+   alert(msg);
+  }
+ }catch(e){
+  const msg="送出或讀取發生異常："+(e.message||"未知錯誤")+"。請先查看試算表是否已寫入，再決定是否重試。";
+  el.textContent=msg;alert(msg);
+ }finally{earlyBusy=false;}
 }
+
 function switchTab(tab){
   const a=tab==="attendance";
   document.getElementById("attendancePanel").className=a?"":"hidden";
