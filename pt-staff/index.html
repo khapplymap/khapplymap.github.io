@@ -295,7 +295,7 @@ function managedControl(g){return shiftControlRows.find(r=>clean(r["日期"])===
 function resetDraft(g){const v=managedControl(g);return !!v&&clean(v["排定狀態"])==="重新排定中";}
 function managementHtml(g){
  const c=managedControl(g),v=c?clean(c["報名狀態"]):"",open=v==="重新開放"&&Date.now()<Date.parse(clean(c["截止時間"]).replace(" ","T")+":00+08:00");
- const btn=(label,act)=>'<button onclick='+JSON.stringify('manageShift('+JSON.stringify(g.key)+','+JSON.stringify(act)+')')+'>'+label+'</button>';
+ const btn=(label,act)=>'<button onclick="manageShift(&quot;'+esc(g.key)+'&quot;,&quot;'+esc(act)+'&quot;)">'+label+'</button>';
  return '<div style="border:1px solid #cbd5e1;background:#f8fafc;padding:12px;border-radius:12px;margin:12px 0">'+
  '<strong>班次管理｜'+(resetDraft(g)?"重新排定中":open?"報名開放中":"管理操作")+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
  btn("重新開放報名","reopenShift")+(open?btn("提前關閉報名","closeShift"):"")+btn("取消整個班次排定","resetShift")+btn("更新正式公布","republishShift")+
