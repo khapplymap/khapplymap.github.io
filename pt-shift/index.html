@@ -49,12 +49,12 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
     <button class="refresh" onclick="loadAll()">重新整理</button>
   </div>
   <div id="content"><div class="card empty">同步資料中…</div></div>
-<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261015-hide-standby-final</div></main>
+<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:14px">版本 20261015-shift-controls</div></main>
 <script>
-const BUILD_VERSION="20261015-hide-standby-final";
+const BUILD_VERSION="20261015-shift-controls";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
-let workers=[],tasks=[],signups=[];
+let workers=[],tasks=[],signups=[],shiftControlRows=[];
 const clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function maskName(name){
@@ -224,7 +224,19 @@ function isTaskToday(group){
   return taskIsoDate(group.date)===today;
 }
 
+function controlFor(group){
+ const date=clean(group.date),time=normalizeTimeText(group.rawTime||group.displayTime);
+ return shiftControlRows.find(r=>clean(r["日期"])===date&&normalizeTimeText(r["班次時間"])===time)||null;
+}
+function manualOpen(group){
+ const control=controlFor(group);
+ if(!control||clean(control["報名狀態"])!=="重新開放")return false;
+ const stamp=clean(control["截止時間"]);
+ if(!/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(stamp))return false;
+ return Date.now()<Date.parse(stamp.replace(" ","T")+":00+08:00");
+}
 function signupState(group){
+ if(manualOpen(group))return {open:true,reason:"管理者已重新開放報名"};
  const now=taipeiNowParts();
  const today=now.year+"-"+now.month+"-"+now.day;
  const mins=Number(now.hour)*60+Number(now.minute);
@@ -282,15 +294,17 @@ async function readSheet(sheetName){
 async function loadAll(){
   document.getElementById("status").textContent="同步中…";
   try{
-    const [workerRows,taskRows,signupRows]=await Promise.all([
+    const [workerRows,taskRows,signupRows,controlRows]=await Promise.all([
       readSheet("工讀生名單"),
       readSheet("工作任務"),
-      readSheet("報名紀錄")
+      readSheet("報名紀錄"),
+      readSheet("班次控制").catch(()=>[])
     ]);
 
     workers=workerRows.map(r=>clean(r["姓名"])).filter(Boolean);
     tasks=taskRows.filter(r=>clean(r["日期"])&&clean(r["地點"]));
     signups=signupRows.filter(r=>clean(r["姓名"]));
+    shiftControlRows=controlRows;
 
     render();
 
@@ -477,6 +491,15 @@ function renderGroupCard(g,i,isHistory){
   let actionHtml="";
   if(people.some(p=>clean(p["排程狀態"])==="已公布")){
     actionHtml=officialRoster(people);
+    if(manualOpen(g)){
+      const availableNames=workers.filter(n=>!people.some(p=>clean(p["姓名"])===n&&clean(p["排程狀態"])==="已公布"));
+      const reopenedOpts='<option value="">請選擇姓名</option>'+availableNames.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
+      actionHtml+='<hr><div class="notice ok" style="display:block">已重新開放報名，原本公布的人員仍保留原學校；新增報名者等待管理者安排。</div>'+
+        '<label>姓名</label><select id="name_'+i+'" onchange="handleNameChange('+i+')">'+reopenedOpts+'</select>'+
+        '<label>可出勤到幾點</label><select id="until_'+i+'">'+timeOptions(g.displayTime)+'</select>'+
+        '<button id="btn_'+i+'" class="btn" onclick="submitSignup('+i+')">確認可以上班</button>'+
+        '<button id="cancel_'+i+'" class="cancel-btn" onclick="cancelSignup('+i+')">取消報名</button>';
+    }
   }else if(isHistory){
     actionHtml='<hr>'+
       '<div style="font-weight:800;margin-bottom:6px">當日出勤人員</div>'+

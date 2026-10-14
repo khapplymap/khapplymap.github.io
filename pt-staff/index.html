@@ -72,7 +72,7 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={},allocationModes={},storedAssignments={};
+let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={},allocationModes={},storedAssignments={},shiftControlRows=[];
 
 function clean(v){return String(v==null?"":v).trim()}
 function esc(v){return clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
@@ -103,10 +103,11 @@ async function loadAll(){
   document.getElementById("summary").textContent="同步中…";
   document.getElementById("previewSummary").textContent="同步中…";
   try{
-    const rs=await Promise.all([csvSheet("報名紀錄"),csvSheet("工讀生名單"),csvSheet("工作任務"),csvSheet("提前人工分配").catch(()=>null)]);
+    const rs=await Promise.all([csvSheet("報名紀錄"),csvSheet("工讀生名單"),csvSheet("工作任務"),csvSheet("提前人工分配").catch(()=>null),csvSheet("班次控制").catch(()=>null)]);
     attendance=objects(rs[0]).filter(r=>clean(r["姓名"]));
     workers=objects(rs[1]).filter(r=>clean(r["姓名"]));
     tasks=objects(rs[2]).filter(r=>clean(r["日期"])&&clean(r["時間"])&&clean(r["地點"]));
+    shiftControlRows=rs[4]?objects(rs[4]):[];
     storedAssignments={};if(rs[3])objects(rs[3]).forEach(r=>{const k=clean(r["日期"])+"||"+normalizeTimeText(r["班次時間"]);(storedAssignments[k]||(storedAssignments[k]={}))[clean(r["姓名"])]=clean(r["指派學校"]);});
     renderAttendance();renderPreview();
   }catch(e){
@@ -289,11 +290,57 @@ function allocate(group,people){
  }
  return {assigned,standby:rest,totalNeed};
 }
+
+function managedControl(g){return shiftControlRows.find(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time);}
+function resetDraft(g){const v=managedControl(g);return !!v&&clean(v["排定狀態"])==="重新排定中";}
+function managementHtml(g){
+ const c=managedControl(g),v=c?clean(c["報名狀態"]):"",open=v==="重新開放"&&Date.now()<Date.parse(clean(c["截止時間"]).replace(" ","T")+":00+08:00");
+ const btn=(label,act)=>'<button onclick="manageShift(&quot;'+esc(g.key)+'&quot;,&quot;'+esc(act)+'&quot;)">'+label+'</button>';
+ return '<div style="border:1px solid #cbd5e1;background:#f8fafc;padding:12px;border-radius:12px;margin:12px 0">'+
+ '<strong>班次管理｜'+(resetDraft(g)?"重新排定中":open?"報名開放中":"管理操作")+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+ btn("重新開放報名","reopenShift")+(open?btn("提前關閉報名","closeShift"):"")+btn("取消整個班次排定","resetShift")+btn("更新正式公布","republishShift")+
+ '</div><small>已公布的舊名單會保留到更新正式公布；僅此班次受影響。</small></div>';
+}
+let manageBusy=false;
+async function manageShift(key,action){
+ if(manageBusy)return;
+ const g=buildTaskGroups().find(x=>x.key===key);if(!g)return alert("找不到班次");
+ let deadline="",assignments;
+ if(action==="reopenShift"){
+  deadline=prompt("請輸入新截止時間（台灣時間 YYYY-MM-DD HH:mm）","")||"";
+  if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(deadline))return alert("截止時間格式錯誤");
+ }
+ if(action==="resetShift"&&!confirm("確定清除整個班次的草稿排定？已公布舊名單保留。"))return;
+ if(action==="republishShift"){
+  assignments=earlyGroupAssignments(g);
+  if(!assignments||!assignments.length)return alert("請先完成所有人員分配");
+  if(g.schools.some(sc=>assignments.filter(a=>a.school===sc.name).length>sc.need))return alert("分配超過學校需求");
+ }
+ manageBusy=true;const el=document.getElementById("earlyActionStatus");el.textContent="送出操作，等待資料核對…";
+ try{
+  const payload={action,date:g.date,time:g.rawTime,deadline};
+  if(assignments)payload.assignments=assignments;
+  await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+  let passed=false;
+  for(let i=0;i<8;i++){
+   await new Promise(resolve=>setTimeout(resolve,1300+400*i));
+   const rows=objects(await csvSheet(action==="republishShift"?"報名紀錄":"班次控制"));
+   passed=action==="republishShift"?assignments.every(a=>rows.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&clean(r["姓名"])===a.name&&clean(r["指派學校"])===a.school&&clean(r["排程狀態"])==="已公布")):
+    rows.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&
+    (action==="reopenShift"?clean(r["報名狀態"])==="重新開放"&&clean(r["截止時間"])===deadline:action==="closeShift"?clean(r["報名狀態"])==="手動關閉":clean(r["排定狀態"])==="重新排定中"));
+   if(passed)break;
+  }
+  if(!passed)throw Error("無法確認成功。請檢查管理密鑰與試算表，不要重複送出。");
+  if(action==="resetShift")manualOverrides[key]={};
+  el.textContent="操作完成";await loadAll();
+ }catch(e){el.textContent=e.message||"操作失敗";alert(el.textContent);}
+ finally{manageBusy=false;}
+}
 function applyOverrides(group,result){
  const people=signupPeople(group),ov=manualOverrides[group.key]||{};
- const saved=storedAssignments[group.key]||{};
+ const saved=resetDraft(group)?{}:(storedAssignments[group.key]||{});
  const published={};
- attendance.forEach(r=>{if(clean(r["日期"])===group.date&&normalizeTimeText(r["班次時間"])===group.time&&clean(r["排程狀態"])==="已公布")published[clean(r["姓名"])]=clean(r["指派學校"]);});
+ if(!resetDraft(group))attendance.forEach(r=>{if(clean(r["日期"])===group.date&&normalizeTimeText(r["班次時間"])===group.time&&clean(r["排程狀態"])==="已公布")published[clean(r["姓名"])]=clean(r["指派學校"]);});
  const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]})),standby=[],pending=[];
  people.forEach(p=>{
   const place=Object.prototype.hasOwnProperty.call(ov,p.name)?ov[p.name]:(published[p.name]||saved[p.name]||"");
@@ -400,7 +447,8 @@ function renderPreview(){
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
     const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
-    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(result.pending.length?result.pending.length+' 人待分配':'分配完成')+'</div></div>'+safetyHtml+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
+    const alreadyPublished=attendance.some(r=>clean(r["日期"])===g.date&&normalizeTimeText(r["班次時間"])===g.time&&clean(r["排程狀態"])==="已公布");
+    return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(result.pending.length?result.pending.length+' 人待分配':'分配完成')+'</div></div>'+managementHtml(g)+safetyHtml+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+(alreadyPublished?'':'<div class="preview-actions"><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div>')+'</section>';
   },g=>g.date);
 }
 
