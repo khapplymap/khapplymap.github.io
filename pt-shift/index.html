@@ -461,6 +461,16 @@ function handleNameChange(i){
   }
 }
 
+function officialRoster(people){
+ const done=people.filter(p=>clean(p["排程狀態"])==="已公布");
+ if(!done.length)return "";
+ const schools={};
+ done.forEach(p=>{const k=clean(p["指派學校"])||"候補";(schools[k]||(schools[k]=[])).push(p);});
+ return '<hr><h3>正式分配名單</h3>'+
+ Object.keys(schools).map(k=>'<div class="school-item"><strong>'+esc(k)+'｜'+schools[k].length+' 人</strong></div>'+
+ schools[k].map(p=>'<div class="person"><strong>'+esc(maskName(p["姓名"]))+'</strong><span class="time">'+esc(p["可出勤到幾點"])+'</span></div>').join("")).join("")+
+ '<div class="notice" style="display:block;margin-top:14px">如需異動請聯絡 Jimmy 或是人資</div>';
+}
 function renderGroupCard(g,i,isHistory){
   const people=groupPeople(g);
 
@@ -478,7 +488,9 @@ function renderGroupCard(g,i,isHistory){
   ).join("");
 
   let actionHtml="";
-  if(isHistory){
+  if(people.some(p=>clean(p["排程狀態"])==="已公布")){
+    actionHtml=officialRoster(people);
+  }else if(isHistory){
     actionHtml='<hr>'+
       '<div style="font-weight:800;margin-bottom:6px">當日出勤人員</div>'+
       '<div class="people">'+peopleHtml+'</div>';
