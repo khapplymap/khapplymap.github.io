@@ -72,7 +72,7 @@ table{width:100%;border-collapse:collapse;margin-top:14px}th,td{text-align:left;
 <script>
 const SHEET_ID="1bcZ1ZzsKq7Ji_QYu9ahb_TMcZLcxowX8DWpio7ehOsI";
 const API="https://script.google.com/macros/s/AKfycbzUSzoGVLRCaqBjE4B8Hbmy-viUuYW7pQSB5mlRaxj-pkE96y8W6K3uls2djftrCKrSBg/exec";
-let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={},allocationModes={};
+let attendance=[],workers=[],tasks=[],rerollNonce={},manualOverrides={},allocationModes={},storedAssignments={};
 
 function clean(v){return String(v==null?"":v).trim()}
 function esc(v){return clean(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
@@ -103,10 +103,11 @@ async function loadAll(){
   document.getElementById("summary").textContent="同步中…";
   document.getElementById("previewSummary").textContent="同步中…";
   try{
-    const rs=await Promise.all([csvSheet("報名紀錄"),csvSheet("工讀生名單"),csvSheet("工作任務")]);
+    const rs=await Promise.all([csvSheet("報名紀錄"),csvSheet("工讀生名單"),csvSheet("工作任務"),csvSheet("提前人工分配").catch(()=>null)]);
     attendance=objects(rs[0]).filter(r=>clean(r["姓名"]));
     workers=objects(rs[1]).filter(r=>clean(r["姓名"]));
     tasks=objects(rs[2]).filter(r=>clean(r["日期"])&&clean(r["時間"])&&clean(r["地點"]));
+    storedAssignments={};if(rs[3])objects(rs[3]).forEach(r=>{const k=clean(r["日期"])+"||"+normalizeTimeText(r["班次時間"]);(storedAssignments[k]||(storedAssignments[k]={}))[clean(r["姓名"])]=clean(r["指派學校"]);});
     renderAttendance();renderPreview();
   }catch(e){
     document.getElementById("summary").textContent="同步失敗";
@@ -271,13 +272,29 @@ function allocate(group,people){
   return {assigned,standby:[...men,...women,...other],totalNeed};
 }
 function applyOverrides(group,result){
-  const all=[];result.assigned.forEach(b=>b.people.forEach(p=>all.push({p,place:b.school})));result.standby.forEach(p=>all.push({p,place:"候補"}));
-  const ov=manualOverrides[group.key]||{};
-  all.forEach(x=>{if(ov[x.p.name])x.place=ov[x.p.name]});
-  const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]})),standby=[];
-  all.forEach(x=>{if(x.place==="候補")standby.push(x.p);else{const b=assigned.find(v=>v.school===x.place);b?b.people.push(x.p):standby.push(x.p)}});
-  return {assigned,standby,totalNeed:result.totalNeed};
+ const people=signupPeople(group),ov=manualOverrides[group.key]||{};
+ const saved=storedAssignments[group.key]||{};
+ const published={};
+ attendance.forEach(r=>{if(clean(r["日期"])===group.date&&normalizeTimeText(r["班次時間"])===group.time&&clean(r["排程狀態"])==="已公布")published[clean(r["姓名"])]=clean(r["指派學校"]);});
+ const assigned=group.schools.map(s=>({school:s.name,need:s.need,people:[]})),standby=[],pending=[];
+ people.forEach(p=>{
+  const place=Object.prototype.hasOwnProperty.call(ov,p.name)?ov[p.name]:(published[p.name]||saved[p.name]||"");
+  if(place==="候補")standby.push(p);
+  else {const box=assigned.find(b=>b.school===place);box?box.people.push(p):pending.push(p);}
+ });
+ return {assigned,standby,pending,totalNeed:result.totalNeed};
 }
+function autoFill(groupKey,mode){
+ const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;
+ const people=signupPeople(g),result=applyOverrides(g,allocate(g,people));
+ const pending=result.pending;
+ if(!manualOverrides[groupKey])manualOverrides[groupKey]={};
+ const counts={};result.assigned.forEach(b=>counts[b.school]=b.people.length);
+ const order=mode==="first"?pending:allocate(g,pending).assigned.flatMap(b=>b.people).concat(allocate(g,pending).standby);
+ order.forEach(p=>{const s=g.schools.find(v=>counts[v.name]<v.need);manualOverrides[groupKey][p.name]=s?s.name:"候補";if(s)counts[s.name]++;});
+ renderPreview();
+}
+function clearGroup(groupKey){const g=buildTaskGroups().find(x=>x.key===groupKey);if(!g)return;manualOverrides[groupKey]={};signupPeople(g).forEach(p=>manualOverrides[groupKey][p.name]="");renderPreview()}
 function setManual(groupKey,name,place){if(!manualOverrides[groupKey])manualOverrides[groupKey]={};manualOverrides[groupKey][name]=place;renderPreview()}
 function setAllocationMode(groupKey,mode){allocationModes[groupKey]=mode;manualOverrides[groupKey]={};renderPreview()}
 function reroll(groupKey){rerollNonce[groupKey]=(rerollNonce[groupKey]||0)+1;manualOverrides[groupKey]={};renderPreview()}
