@@ -301,14 +301,35 @@ function managementHtml(g){
  btn("重新開放報名","reopenShift")+(open?btn("提前關閉報名","closeShift"):"")+btn("取消整個班次排定","resetShift")+btn("更新正式公布","republishShift")+
  '</div><small>已公布的舊名單會保留到更新正式公布；僅此班次受影響。</small></div>';
 }
+
+function choose24HourDeadline(){
+ return new Promise(resolve=>{
+  const parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).map(p=>[p.type,p.value]));
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:#0f172ab0;display:flex;align-items:center;justify-content:center;padding:16px";
+  const options=(n,selected)=>Array.from({length:n},(_,i)=>String(i).padStart(2,"0")).map(v=>'<option value="'+v+'"'+(v===selected?' selected':'')+'>'+v+'</option>').join("");
+  overlay.innerHTML='<div role="dialog" aria-modal="true" style="width:min(400px,100%);background:white;color:#0f172a;border-radius:16px;padding:22px"><h3 style="margin:0 0 8px">重新開放報名</h3><p>設定新的截止時間（台灣時間、24 小時制）</p><label>截止日期</label><input id="reopenDate" type="date" style="width:100%;padding:9px;box-sizing:border-box;margin:7px 0 16px"><label>截止時間（00:00～23:59）</label><div style="display:flex;gap:8px;margin:8px 0"><select id="reopenHour" style="flex:1;padding:9px">'+options(24,parts.hour)+'</select><b>:</b><select id="reopenMinute" style="flex:1;padding:9px">'+options(60,"00")+'</select></div><div style="display:flex;gap:8px;margin-top:20px"><button id="reopenCancel" style="flex:1">取消</button><button id="reopenConfirm" style="flex:1;background:#0f766e;color:white">確認重新開放</button></div></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector("#reopenDate").value=parts.year+"-"+parts.month+"-"+parts.day;
+  const cancel=()=>{overlay.remove();resolve("");};
+  overlay.querySelector("#reopenCancel").onclick=cancel;
+  overlay.querySelector("#reopenConfirm").onclick=()=>{
+    const d=overlay.querySelector("#reopenDate").value,h=overlay.querySelector("#reopenHour").value,m=overlay.querySelector("#reopenMinute").value;
+    if(!d)return alert("請選擇日期");
+    const ms=Date.parse(d+"T"+h+":"+m+":00+08:00");
+    if(!Number.isFinite(ms)||ms<=Date.now())return alert("截止時間必須晚於現在");
+    overlay.remove();resolve(d+" "+h+":"+m);
+  };
+ });
+}
 let manageBusy=false;
 async function manageShift(key,action){
  if(manageBusy)return;
  const g=buildTaskGroups().find(x=>x.key===key);if(!g)return alert("找不到班次");
  let deadline="",assignments;
  if(action==="reopenShift"){
-  deadline=prompt("請輸入新截止時間（台灣時間 YYYY-MM-DD HH:mm）","")||"";
-  if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(deadline))return alert("截止時間格式錯誤");
+  deadline=await choose24HourDeadline();
+  if(!deadline)return;
  }
  if(action==="resetShift"&&!confirm("確定清除整個班次的草稿排定？已公布舊名單保留。"))return;
  if(action==="republishShift"){
