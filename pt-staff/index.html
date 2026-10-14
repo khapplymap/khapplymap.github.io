@@ -399,7 +399,7 @@ function renderPreview(){
       const m=b.people.filter(p=>p.sex==="男").length,f=b.people.filter(p=>p.sex==="女").length,mv=b.people.filter(p=>p.move==="可").length;
       return '<div class="preview-school"><div class="preview-school-title"><span>'+esc(b.school)+'</span><span>'+b.people.length+'/'+b.need+'</span></div><div class="preview-ratio">男 '+m+'｜女 '+f+'｜可搬運 '+mv+'</div>'+b.people.map(p=>personPreviewHtml(g,p,b.school)).join("")+'</div>';
     }).join("");
-    const standby=result.standby.length?'<div class="standby"><h3>候補 '+result.standby.length+' 人</h3>'+result.standby.map(p=>personPreviewHtml(g,p,"候補")).join("")+'</div>':'';
+    const standby=''; // 候補人員仍保留在排程資料中，但不在管理預覽列出
     return '<section class="card"><div class="head"><div><div class="place">'+esc(g.date+' '+g.time)+'｜分配預覽</div><div class="date">報名 '+people.length+' 人｜需求 '+result.totalNeed+' 人｜男 '+totalM+' / 女 '+totalF+'</div></div><div class="count">'+(result.pending.length?result.pending.length+' 人待分配':'分配完成')+'</div></div>'+safetyHtml+pendingHtml+modeButtons+orderList+'<div class="preview-grid">'+schools+'</div>'+standby+'<div class="preview-actions"><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',false)">儲存建議分配</button><button onclick="saveEarlyGroup(\''+g.key.replace(/'/g,"\\'")+'\',true)">提前正式公布</button></div></section>';
   },g=>g.date);
 }
