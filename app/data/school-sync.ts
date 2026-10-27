@@ -13,6 +13,8 @@ export type School = {
   newDeviceQuantity?: number | string;
   chargingCartSpec?: string;
   chargingCartQuantity?: number | string;
+  touchPenQuantity?: number | string;
+  touchPenChargingBoxQuantity?: number | string;
   newImplementationProgress?: string;
   newDevices?: EquipmentItem[];
   chargingCarts?: EquipmentItem[];
@@ -122,6 +124,23 @@ function definedSchoolFields(school: School) {
   ) as Partial<School>;
 }
 
+function positiveQuantity(value: unknown) {
+  const number = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+export function hasAllocatedEquipment(school: School) {
+  return (
+    positiveQuantity(school.deviceQuantity) > 0 ||
+    positiveQuantity(school.newDeviceQuantity) > 0 ||
+    positiveQuantity(school.chargingCartQuantity) > 0 ||
+    positiveQuantity(school.touchPenQuantity) > 0 ||
+    positiveQuantity(school.touchPenChargingBoxQuantity) > 0 ||
+    (school.newDevices ?? []).some((item) => positiveQuantity(item.quantity) > 0) ||
+    (school.chargingCarts ?? []).some((item) => positiveQuantity(item.quantity) > 0)
+  );
+}
+
 export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[] {
   const headers = (table.cols ?? []).map((column) => normalizedHeader(column.label));
   const findColumn = (...aliases: string[]) => {
@@ -148,6 +167,8 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
     cart30To32U: kind === "new" ? findColumn("30-32U", "30～32U") : -1,
     cart34To36U: kind === "new" ? findColumn("34-36U", "34～36U") : -1,
     cart42U: kind === "new" ? findColumn("42U") : -1,
+    touchPen: kind === "new" ? findColumn("觸控筆") : -1,
+    touchPenChargingBox: kind === "new" ? findColumn("觸控筆充電箱") : -1,
   };
 
   if (indexes.name < 0) return [];
@@ -203,6 +224,9 @@ export function readRemoteSchools(table: GoogleTable, kind: SheetKind): School[]
       newDeviceQuantity: valueAt(cells, indexes.newDeviceQuantity) as number | string | undefined,
       chargingCartSpec: valueAt(cells, indexes.chargingCartSpec) as string | undefined,
       chargingCartQuantity: valueAt(cells, indexes.chargingCartQuantity) as number | string | undefined,
+      touchPenQuantity: kind === "new" ? positiveNumberAt(cells, indexes.touchPen) : undefined,
+      touchPenChargingBoxQuantity:
+        kind === "new" ? positiveNumberAt(cells, indexes.touchPenChargingBox) : undefined,
       newImplementationProgress: progressValueAt(cells, indexes.newImplementationProgress),
       ...(kind === "new" ? { newDevices, chargingCarts } : {}),
     }];
@@ -250,7 +274,7 @@ export function updateSchoolsFromGooglePayload(
     });
   }
 
-  return next;
+  return next.filter(hasAllocatedEquipment);
 }
 
 export function schoolsFromGooglePayloads(sheets: Array<{ kind: SheetKind; payload: GoogleSheetPayload }>) {
@@ -270,8 +294,10 @@ export function schoolsFromGooglePayloads(sheets: Array<{ kind: SheetKind; paylo
   }
 
   const remoteSchools = [...combinedByName.values()];
+  const merged = mergeSchools(remoteSchools);
   return {
-    ...mergeSchools(remoteSchools),
+    ...merged,
+    schools: merged.schools.filter(hasAllocatedEquipment),
     sheetRows,
     status: sheetRows > 0 ? "synced" as const : "empty" as const,
   };
